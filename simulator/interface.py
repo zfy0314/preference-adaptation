@@ -1,72 +1,176 @@
 import os
+import queue as _queue
 import sys
+import time
+from multiprocessing import Process, Queue
 from pprint import pprint
+from typing import Callable, Tuple
 
+import _io
+import ai2thor
 import pygame
 from ai2thor.controller import Controller
 from ai2thor.platform import CloudRendering
 
-FLOOR_PLAN = "FloorPlan10"
-SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 900
-SCREEN_SIZE = (SCREEN_WIDTH, SCREEN_HEIGHT)
-DEBUG = True
 
-# pygame step
-pygame.init()
-scrn = pygame.display.set_mode(SCREEN_SIZE)
-font = pygame.font.SysFont(None, 100)
-scrn.fill((255, 255, 255))
-text = font.render("Loading...", True, (0, 0, 0))
-text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-scrn.blit(text, text_rect)
-pygame.display.flip()
+class Interface(Process):
+    """Async interface for AI2Thor simulator user study
 
+    model: a callable that takes in the state and output an string hint, potentially
+           takes a while to process
+    """
 
-# ai2thor setup
-controller = Controller(
-    platform=CloudRendering,
-    scene=FLOOR_PLAN,
-    width=SCREEN_WIDTH,
-    height=SCREEN_HEIGHT,
-    rotateStepDegrees=30,
-    snapToGrid=False,
-)
-state = controller.step(action="LookDown", degrees=15)
-pprint(state)
-key_binding = {
-    pygame.K_UP: dict(action="LookUp"),
-    pygame.K_LEFT: dict(action="RotateLeft"),
-    pygame.K_DOWN: dict(action="LookDown"),
-    pygame.K_RIGHT: dict(action="RotateRight"),
-    pygame.K_w: dict(action="MoveAhead"),
-    pygame.K_a: dict(action="MoveLeft", moveMagnitude=0.15),
-    pygame.K_s: dict(action="MoveBack"),
-    pygame.K_d: dict(action="MoveRight", moveMagnitude=0.15),
-    pygame.K_r: dict(  # reset
-        action="reset",
-        position=dict(x=0.0, y=0.9, z=-1.25),
-        rotation=dict(x=0.0, y=90.0, z=0.0),
-        horizon=30,
-        standing=True,
-    ),
-}
+    white = (255, 255, 255)
+    black = (0, 0, 0)
+    key_binding = {
+        pygame.K_UP: dict(action="LookUp"),
+        pygame.K_LEFT: dict(action="RotateLeft"),
+        pygame.K_DOWN: dict(action="LookDown"),
+        pygame.K_RIGHT: dict(action="RotateRight"),
+        pygame.K_w: dict(action="MoveAhead"),
+        pygame.K_a: dict(action="MoveLeft", moveMagnitude=0.15),
+        pygame.K_s: dict(action="MoveBack"),
+        pygame.K_d: dict(action="MoveRight", moveMagnitude=0.15),
+    }
+    model: Callable[[ai2thor.server.Event], str]
+    daemon: bool
+    state: Queue
+    hint: Queue
+    print_output: _io.TextIOWrapper
 
-# game loop
-while True:
+    def __init__(
+        self,
+        floor_plan: str,
+        screen_size: Tuple[int, int],
+        model: Callable[[ai2thor.server.Event], str],
+        debug=False,
+    ):
 
-    scrn.blit(pygame.surfarray.make_surface(state.frame.transpose(1, 0, 2)), (0, 0))
-    pygame.display.flip()
+        # spawn new process
+        super().__init__()
+        self.hint = Queue()
+        self.state = Queue(1)
+        self.daemon = True
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            break
+        # pygame interface init
+        pygame.init()
+        width, height = screen_size
+        offset = height // 10
+        screen = pygame.display.set_mode((width, int(height * 1.1)))
+        screen.fill(Interface.white)
+        banner = pygame.Rect((0, 0), (width, offset))
 
-        if event.type == pygame.KEYDOWN:
+        # add loading page
+        mktext = pygame.font.SysFont(None, height // 10).render
+        text = mktext("Loading...", True, Interface.black)
+        text_rect = text.get_rect(center=(width // 2, height // 2))
+        screen.blit(text, text_rect)
+        pygame.display.flip()
+
+        # ai2thor init
+        controller = Controller(
+            platform=CloudRendering,
+            scene=floor_plan,
+            width=width,
+            height=height,
+            rotateStepDegrees=30,
+            snapToGrid=False,
+        )
+        state = controller.step(action="Teleport")  # get initial state
+        self.state.put(state)
+        agent = state.metadata["agent"]
+        Interface.key_binding[pygame.K_r] = dict(  # add reset button
+            action="Teleport",
+            position=agent["position"],
+            rotation=agent["rotation"],
+            isStanding=agent["isStanding"],
+            horizon=agent["cameraHorizon"],
+        )
+        screen.blit(
+            pygame.surfarray.make_surface(state.frame.transpose(1, 0, 2)),
+            (0, offset),
+        )
+        pygame.display.flip()
+
+        # start game loop
+        self.model = model
+        self.print_output = sys.stdout if debug else open(os.devnull, "w")
+        self.start()
+
+        while True:
+
+            for event in pygame.event.get():
+
+                if event.type == pygame.QUIT:
+                    break
+
+                # handle key press
+                if event.type == pygame.KEYDOWN:
+                    try:
+                        action = Interface.key_binding[event.key]
+                    except KeyError:
+                        pass
+                    else:
+                        state = controller.step(**action)
+                        screen.blit(
+                            pygame.surfarray.make_surface(
+                                state.frame.transpose(1, 0, 2)
+                            ),
+                            (0, offset),
+                        )
+                        try:
+                            self.state.get_nowait()
+                        except _queue.Empty:
+                            pass
+                        finally:
+                            self.state.put(state)
+                        pygame.display.flip()
+                        pprint(state, self.print_output)
+
+            # handle hint
             try:
-                action = key_binding[event.key]
-            except KeyError:
+                hint = self.hint.get_nowait()
+            except _queue.Empty:
                 pass
             else:
-                state = controller.step(**action)
-                pprint(state, sys.stdout if DEBUG else os.devnull)
+                screen.fill(Interface.white, banner)
+                text = mktext(hint, True, Interface.black)
+                screen.blit(text, (0, 0))
+                pprint("updating hint to: {}".format(hint), self.print_output)
+                pygame.display.flip()
+
+    def run(self):
+        """Whenever there is a (new) state, process the hint and put it into queue"""
+
+        while True:
+            state = self.state.get()
+            pprint("[background] get new state", self.print_output)
+            t = time.time()
+            hint = self.model(state)
+            self.hint.put(hint)
+            pprint(
+                "[background] give new hint after {:.3f}s".format(time.time() - t),
+                self.print_output,
+            )
+
+
+if __name__ == "__main__":
+
+    import random
+
+    def dummy_model(state: ai2thor.server.Event) -> str:
+
+        time.sleep(random.randint(0, 3))
+        actions = [
+            "MoveAhead",
+            "MoveLeft",
+            "MoveBack",
+            "MoveRight",
+            "RotateLeft",
+            "RotateRight",
+            "LookUp",
+            "LookDown",
+        ]
+        return "Recommended Action: {}".format(random.choice(actions))
+
+    Interface("FloorPlan10", (1600, 900), dummy_model, True)
