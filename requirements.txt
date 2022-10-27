@@ -1,0 +1,2 @@
+ai2thor==4.2.0
+pygame
