@@ -54,6 +54,7 @@ class Interface(Process):
 
         # pygame interface init
         pygame.init()
+        pygame.mouse.set_visible(False)
         width, height = screen_size
         offset = height // 10
         screen = pygame.display.set_mode((width, int(height * 1.1)))
@@ -83,7 +84,7 @@ class Interface(Process):
             action="Teleport",
             position=agent["position"],
             rotation=agent["rotation"],
-            isStanding=agent["isStanding"],
+            standing=agent["isStanding"],
             horizon=agent["cameraHorizon"],
         )
         screen.blit(
@@ -96,62 +97,79 @@ class Interface(Process):
         self.model = model
         self.print_output = sys.stdout if debug else open(os.devnull, "w")
         self.start()
+        print("starting loop in:", self.pid)
 
-        while True:
+        try:
+            while True:
+                for event in pygame.event.get():
 
-            for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        raise KeyboardInterrupt
 
-                if event.type == pygame.QUIT:
-                    break
-
-                # handle key press
-                if event.type == pygame.KEYDOWN:
-                    try:
-                        action = Interface.key_binding[event.key]
-                    except KeyError:
-                        pass
-                    else:
-                        state = controller.step(**action)
-                        screen.blit(
-                            pygame.surfarray.make_surface(
-                                state.frame.transpose(1, 0, 2)
-                            ),
-                            (0, offset),
-                        )
+                    # handle key press
+                    if event.type == pygame.KEYDOWN:
                         try:
-                            self.state.get_nowait()
-                        except _queue.Empty:
-                            pass
-                        finally:
-                            self.state.put(state)
-                        pygame.display.flip()
-                        pprint(state, self.print_output)
+                            action = Interface.key_binding[event.key]
+                        except KeyError:
+                            if event.key == pygame.K_ESCAPE:
+                                raise KeyboardInterrupt
+                        else:
+                            state = controller.step(**action)
+                            screen.blit(
+                                pygame.surfarray.make_surface(
+                                    state.frame.transpose(1, 0, 2)
+                                ),
+                                (0, offset),
+                            )
+                            try:
+                                self.state.get_nowait()
+                            except _queue.Empty:
+                                pass
+                            finally:
+                                self.state.put(state)
+                            pygame.display.flip()
+                            pprint(state, self.print_output)
 
-            # handle hint
+                # handle hint
+                try:
+                    hint = self.hint.get_nowait()
+                except _queue.Empty:
+                    pass
+                else:
+                    screen.fill(Interface.white, banner)
+                    text = mktext(hint, True, Interface.black)
+                    screen.blit(text, (0, 0))
+                    pprint("updating hint to: {}".format(hint), self.print_output)
+                    pygame.display.flip()
+
+        except KeyboardInterrupt:
+            pygame.display.quit()
+            pygame.quit()
+
+        finally:
             try:
-                hint = self.hint.get_nowait()
+                self.state.get_nowait()
             except _queue.Empty:
                 pass
-            else:
-                screen.fill(Interface.white, banner)
-                text = mktext(hint, True, Interface.black)
-                screen.blit(text, (0, 0))
-                pprint("updating hint to: {}".format(hint), self.print_output)
-                pygame.display.flip()
+            finally:
+                self.state.put(None)  # sync with background process
 
     def run(self):
         """Whenever there is a (new) state, process the hint and put it into queue"""
 
-        while True:
-            state = self.state.get()
+        state = self.state.get()
+        while state is not None:  # sync with foreground process
             pprint("[background] get new state", self.print_output)
             t = time.time()
             hint = self.model(state)
             self.hint.put(hint)
             pprint(
-                "[background] give new hint after {:.3f}s".format(time.time() - t),
+                "[background] give new hint {} after {:.3f}s".format(
+                    hint, time.time() - t
+                ),
                 self.print_output,
             )
+            state = self.state.get()
 
 
 if __name__ == "__main__":
@@ -173,4 +191,4 @@ if __name__ == "__main__":
         ]
         return "Recommended Action: {}".format(random.choice(actions))
 
-    Interface("FloorPlan10", (1600, 900), dummy_model, True)
+    Interface("FloorPlan14", (1600, 900), dummy_model, True)
