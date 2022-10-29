@@ -24,6 +24,7 @@ class Interface(Process):
     """
 
     white = (255, 255, 255)
+    gray = (128, 128, 128)
     black = (0, 0, 0)
     key_binding = {
         # pygame.K_UP: dict(action="LookUp"),
@@ -35,11 +36,63 @@ class Interface(Process):
         pygame.K_s: dict(action="MoveBack"),
         pygame.K_d: dict(action="MoveRight"),
     }
+    instruction = "Press [ESC] to quit"
     daemon: bool = True
     model: Callable[[ai2thor.server.Event], str]
     state: Queue
     hint: Queue
     print_output: _io.TextIOWrapper
+
+    def _show_instructions(
+        self,
+        instruction: str,
+        screen: pygame.Surface,
+        mktext: callable,
+        center: Tuple[int, int],
+        button_bbox: Tuple[int, int, int, int],  # (left, top, width, height)
+        button_text="continue",
+    ):
+        """Show the instructions until the participant dismiss it"""
+
+        # add instructions
+        text = mktext(instruction, True, Interface.black)
+        text_rect = text.get_rect(center=center)
+        screen.blit(text, text_rect)
+
+        # wait till the participant click on the button
+        left, top, width, height = button_bbox
+        text = mktext(button_text, True, Interface.white)
+        text_rect = text.get_rect(center=(left + width // 2, top + height // 2))
+        inbox = (
+            lambda x, y: left <= x
+            and x <= left + width
+            and top <= y
+            and y <= top + height
+        )
+        try:
+            while True:
+
+                # add button
+                if inbox(*pygame.mouse.get_pos()):
+                    pygame.draw.rect(screen, Interface.black, button_bbox)
+                else:
+                    pygame.draw.rect(screen, Interface.gray, button_bbox)
+                screen.blit(text, text_rect)
+                pygame.display.flip()
+
+                for event in pygame.event.get():
+                    if (event.type == pygame.QUIT) or (
+                        event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                    ):
+                        exit()
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if inbox(*pygame.mouse.get_pos()):
+                            raise KeyboardInterrupt
+
+        except KeyboardInterrupt:
+            pass
+        finally:
+            pygame.display.flip()
 
     def __init__(
         self,
@@ -61,7 +114,6 @@ class Interface(Process):
 
         # pygame interface init
         pygame.init()
-        pygame.mouse.set_visible(False)
         pygame.key.set_repeat(30)
         width, height = screen_size
         offset = height // 10
@@ -69,9 +121,18 @@ class Interface(Process):
         screen = pygame.display.set_mode((width, int(height * 1.1)))
         screen.fill(Interface.white)
         banner = pygame.Rect((0, 0), (width, offset))
+        mktext = pygame.font.SysFont(None, height // 10).render
+        self._show_instructions(
+            Interface.instruction,
+            screen,
+            mktext,
+            center,
+            (offset, height - offset, 400, offset),
+        )
+        pygame.mouse.set_visible(False)
 
         # add loading page
-        mktext = pygame.font.SysFont(None, height // 10).render
+        screen.fill(Interface.white)
         text = mktext("Loading...", True, Interface.black)
         text_rect = text.get_rect(center=center)
         screen.blit(text, text_rect)
