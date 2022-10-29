@@ -1,10 +1,11 @@
 import os
+import pdb
 import queue as _queue
 import sys
 import time
 from multiprocessing import Process, Queue
 from pprint import pprint
-from typing import Callable, Tuple
+from typing import Callable, List, Tuple
 
 import _io
 import ai2thor
@@ -27,16 +28,17 @@ class Interface(Process):
     gray = (128, 128, 128)
     black = (0, 0, 0)
     key_binding = {
-        # pygame.K_UP: dict(action="LookUp"),
-        # pygame.K_LEFT: dict(action="RotateLeft"),
-        # pygame.K_DOWN: dict(action="LookDown"),
-        # pygame.K_RIGHT: dict(action="RotateRight"),
         pygame.K_w: dict(action="MoveAhead"),
         pygame.K_a: dict(action="MoveLeft"),
         pygame.K_s: dict(action="MoveBack"),
         pygame.K_d: dict(action="MoveRight"),
     }
-    instruction = "Press [ESC] to quit"
+    instructions = [
+        "Instructions:",
+        "Press [ESC] to quit",
+        "Press [E] to open/close {fridge, cupboard, microwave ...}",
+        "Press [F] to turn on/off {stove, microwave, coffee machine, ...}",
+    ]
     daemon: bool = True
     model: Callable[[ai2thor.server.Event], str]
     state: Queue
@@ -45,19 +47,21 @@ class Interface(Process):
 
     def _show_instructions(
         self,
-        instruction: str,
+        instructions: List[str],
         screen: pygame.Surface,
         mktext: callable,
-        center: Tuple[int, int],
+        center: Tuple[int, int],  # top middle
         button_bbox: Tuple[int, int, int, int],  # (left, top, width, height)
         button_text="continue",
     ):
         """Show the instructions until the participant dismiss it"""
 
         # add instructions
-        text = mktext(instruction, True, Interface.black)
-        text_rect = text.get_rect(center=center)
-        screen.blit(text, text_rect)
+        x, y = center
+        for i, instruction in enumerate(instructions):
+            text = mktext(instruction, True, Interface.black)
+            text_rect = text.get_rect(center=(x, (1.5 + i) * y))
+            screen.blit(text, text_rect)
 
         # wait till the participant click on the button
         left, top, width, height = button_bbox
@@ -94,6 +98,18 @@ class Interface(Process):
         finally:
             pygame.display.flip()
 
+    def _update_display_with_circle(
+        self,
+        screen: pygame.Surface,
+        center: Tuple[int, int],
+        size: int,
+        color: Tuple[int, int, int],
+    ):
+        """Put a circle at the center of the display then update"""
+
+        pygame.draw.circle(screen, color, center, size)
+        pygame.display.flip()
+
     def __init__(
         self,
         floor_plan: str,
@@ -121,15 +137,16 @@ class Interface(Process):
         screen = pygame.display.set_mode((width, int(height * 1.1)))
         screen.fill(Interface.white)
         banner = pygame.Rect((0, 0), (width, offset))
-        mktext = pygame.font.SysFont(None, height // 10).render
+        mktext = pygame.font.SysFont(None, height // 12).render
         self._show_instructions(
-            Interface.instruction,
+            Interface.instructions,
             screen,
             mktext,
-            center,
+            (width // 2, offset),
             (offset, height - offset, 400, offset),
         )
         pygame.mouse.set_visible(False)
+        keyclick = pygame.time.Clock()
 
         # add loading page
         screen.fill(Interface.white)
@@ -147,8 +164,19 @@ class Interface(Process):
             # rotateStepDegrees=30,
             gridSize=0.05,
             snapToGrid=False,
+            fieldOfView=60,
         )
         state = controller.step(action="Teleport")  # get initial state
+        openables = {
+            obj["objectId"]: ("OpenObject", "CloseObject")
+            for obj in state.metadata["objects"]
+            if obj["openable"]
+        }
+        toggleables = {
+            obj["objectId"]: ("ToggleObjectOn", "ToggleObjectOff")
+            for obj in state.metadata["objects"]
+            if obj["toggleable"]
+        }
         self.state.put(state)
         agent = state.metadata["agent"]
         Interface.key_binding[pygame.K_r] = dict(  # add reset button
@@ -162,7 +190,8 @@ class Interface(Process):
             pygame.surfarray.make_surface(state.frame.transpose(1, 0, 2)),
             (0, offset),
         )
-        pygame.display.flip()
+        # pygame.display.flip()
+        self._update_display_with_circle(screen, center, offset // 8, Interface.white)
         pygame.mouse.set_pos(center)
 
         # start game loop
@@ -171,6 +200,7 @@ class Interface(Process):
         self.start()
         print("starting loop in:", self.pid)
 
+        # TODO: code refactor
         try:
             while True:
                 old_state = state
@@ -183,13 +213,77 @@ class Interface(Process):
 
                     # handle key press
                     elif event.type == pygame.KEYDOWN:
+                        action = None
                         try:
                             action = Interface.key_binding[event.key]
                         except KeyError:
                             if event.key == pygame.K_ESCAPE:
                                 raise KeyboardInterrupt
-                        else:
-                            state = controller.step(**action)
+                            elif event.key == pygame.K_p:
+                                pdb.set_trace()
+
+                            # handle object interaction with keyboard
+                            if event.key == pygame.K_e and keyclick.tick() > 250:
+                                query = controller.step(
+                                    action="GetObjectInFrame",
+                                    x=0.5,
+                                    y=0.5,
+                                )
+                                if query:
+                                    objectId = query.metadata["actionReturn"]
+                                    try:
+                                        (action, alternative) = openables[objectId]
+                                        openables[objectId] = (alternative, action)
+                                        action = dict(action=action, objectId=objectId)
+                                    except KeyError:
+                                        pass
+
+                            elif event.key == pygame.K_f and keyclick.tick() > 250:
+                                query = controller.step(
+                                    action="GetObjectInFrame",
+                                    x=0.5,
+                                    y=0.5,
+                                )
+                                if query:
+                                    objectId = query.metadata["actionReturn"]
+                                    try:
+                                        (action, alternative) = toggleables[objectId]
+                                        toggleables[objectId] = (alternative, action)
+                                        action = dict(action=action, objectId=objectId)
+                                    except KeyError:
+                                        pass
+
+                            elif event.key == pygame.K_q and keyclick.tick() > 500:
+                                action = dict(
+                                    action="ThrowObject",
+                                    moveMagnitude=20,
+                                    forceAction=True,
+                                )
+
+                        finally:
+                            if action is not None:
+                                state = controller.step(**action)
+                                pprint(state, stream=self.print_output)
+
+                    # handle object interaction with mouse
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        query = controller.step(
+                            action="GetObjectInFrame",
+                            x=0.5,
+                            y=0.5,
+                        )
+                        if query:
+                            objectId = query.metadata["actionReturn"]
+                            for action in [
+                                "PutObject",
+                                "PickupObject",
+                            ]:
+                                state = controller.step(
+                                    action=action, objectId=objectId
+                                )
+                                pprint(state, stream=self.print_output)
+                                if state.metadata["lastActionSuccess"]:
+                                    break
 
                 # handle mouse movement
                 x, y = pygame.mouse.get_pos()
@@ -220,8 +314,11 @@ class Interface(Process):
                         pass
                     finally:
                         self.state.put(state)
+                    self._update_display_with_circle(
+                        screen, center, offset // 8, Interface.white
+                    )
                     pygame.display.flip()
-                    pprint(state, self.print_output)
+                    pprint(state, stream=self.print_output)
 
                 # update hint
                 try:
@@ -232,7 +329,9 @@ class Interface(Process):
                     screen.fill(Interface.white, banner)
                     text = mktext(hint, True, Interface.black)
                     screen.blit(text, (0, 0))
-                    pprint("updating hint to: {}".format(hint), self.print_output)
+                    pprint(
+                        "updating hint to: {}".format(hint), stream=self.print_output
+                    )
                     pygame.display.flip()
 
         except KeyboardInterrupt:
@@ -252,7 +351,7 @@ class Interface(Process):
 
         state = self.state.get()
         while state is not None:  # sync with foreground process
-            pprint("[background] get new state", self.print_output)
+            pprint("[background] get new state", stream=self.print_output)
             t = time.time()
             hint = self.model(state)
             self.hint.put(hint)
@@ -260,7 +359,7 @@ class Interface(Process):
                 "[background] give new hint {} after {:.3f}s".format(
                     hint, time.time() - t
                 ),
-                self.print_output,
+                stream=self.print_output,
             )
             state = self.state.get()
 
@@ -271,7 +370,8 @@ if __name__ == "__main__":
 
     def dummy_model(state: ai2thor.server.Event) -> str:
 
-        time.sleep(random.randint(0, 3))
+        fib = lambda x: x if x < 2 else fib(x - 1) + fib(x - 2)
+        _ = fib(random.randint(30, 40))  # mimic computation heavy step
         actions = [
             "MoveAhead",
             "MoveLeft",
