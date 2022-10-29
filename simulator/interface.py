@@ -18,22 +18,25 @@ class Interface(Process):
 
     model: a callable that takes in the state and output an string hint, potentially
            takes a while to process
+    state: a cross-process placeholder for the state (implemented as size 1 queue)
+    hint: a cross-process queue for the hints generated
+    print_output: redirected output stream
     """
 
     white = (255, 255, 255)
     black = (0, 0, 0)
     key_binding = {
-        pygame.K_UP: dict(action="LookUp"),
-        pygame.K_LEFT: dict(action="RotateLeft"),
-        pygame.K_DOWN: dict(action="LookDown"),
-        pygame.K_RIGHT: dict(action="RotateRight"),
+        # pygame.K_UP: dict(action="LookUp"),
+        # pygame.K_LEFT: dict(action="RotateLeft"),
+        # pygame.K_DOWN: dict(action="LookDown"),
+        # pygame.K_RIGHT: dict(action="RotateRight"),
         pygame.K_w: dict(action="MoveAhead"),
-        pygame.K_a: dict(action="MoveLeft", moveMagnitude=0.15),
+        pygame.K_a: dict(action="MoveLeft"),
         pygame.K_s: dict(action="MoveBack"),
-        pygame.K_d: dict(action="MoveRight", moveMagnitude=0.15),
+        pygame.K_d: dict(action="MoveRight"),
     }
+    daemon: bool = True
     model: Callable[[ai2thor.server.Event], str]
-    daemon: bool
     state: Queue
     hint: Queue
     print_output: _io.TextIOWrapper
@@ -43,20 +46,26 @@ class Interface(Process):
         floor_plan: str,
         screen_size: Tuple[int, int],
         model: Callable[[ai2thor.server.Event], str],
+        mouse_fraction: float = 0.3,
         debug=False,
     ):
+        """
+        mouse_fraction: pixel value of the mouse vs degrees rotated
+        debug: whether expose info to stdout
+        """
 
         # spawn new process
         super().__init__()
         self.hint = Queue()
         self.state = Queue(1)
-        self.daemon = True
 
         # pygame interface init
         pygame.init()
         pygame.mouse.set_visible(False)
+        pygame.key.set_repeat(30)
         width, height = screen_size
         offset = height // 10
+        center = (width // 2, offset + height // 2)
         screen = pygame.display.set_mode((width, int(height * 1.1)))
         screen.fill(Interface.white)
         banner = pygame.Rect((0, 0), (width, offset))
@@ -64,7 +73,7 @@ class Interface(Process):
         # add loading page
         mktext = pygame.font.SysFont(None, height // 10).render
         text = mktext("Loading...", True, Interface.black)
-        text_rect = text.get_rect(center=(width // 2, height // 2))
+        text_rect = text.get_rect(center=center)
         screen.blit(text, text_rect)
         pygame.display.flip()
 
@@ -74,7 +83,8 @@ class Interface(Process):
             scene=floor_plan,
             width=width,
             height=height,
-            rotateStepDegrees=30,
+            # rotateStepDegrees=30,
+            gridSize=0.05,
             snapToGrid=False,
         )
         state = controller.step(action="Teleport")  # get initial state
@@ -92,6 +102,7 @@ class Interface(Process):
             (0, offset),
         )
         pygame.display.flip()
+        pygame.mouse.set_pos(center)
 
         # start game loop
         self.model = model
@@ -101,13 +112,16 @@ class Interface(Process):
 
         try:
             while True:
+                old_state = state
+
+                # handle input
                 for event in pygame.event.get():
 
                     if event.type == pygame.QUIT:
                         raise KeyboardInterrupt
 
                     # handle key press
-                    if event.type == pygame.KEYDOWN:
+                    elif event.type == pygame.KEYDOWN:
                         try:
                             action = Interface.key_binding[event.key]
                         except KeyError:
@@ -115,22 +129,40 @@ class Interface(Process):
                                 raise KeyboardInterrupt
                         else:
                             state = controller.step(**action)
-                            screen.blit(
-                                pygame.surfarray.make_surface(
-                                    state.frame.transpose(1, 0, 2)
-                                ),
-                                (0, offset),
-                            )
-                            try:
-                                self.state.get_nowait()
-                            except _queue.Empty:
-                                pass
-                            finally:
-                                self.state.put(state)
-                            pygame.display.flip()
-                            pprint(state, self.print_output)
 
-                # handle hint
+                # handle mouse movement
+                x, y = pygame.mouse.get_pos()
+                dx, dy = x - center[0], y - center[1]
+                pygame.mouse.set_pos(center)
+                if dx != 0:
+                    state = controller.step(
+                        action="RotateRight", degrees=mouse_fraction * dx
+                    )
+                if dy > 0:
+                    state = controller.step(
+                        action="LookDown", degrees=abs(mouse_fraction * dy)
+                    )
+                elif dy < 0:
+                    state = controller.step(
+                        action="LookUp", degrees=abs(mouse_fraction * dy)
+                    )
+
+                # update display
+                if state is not old_state:
+                    screen.blit(
+                        pygame.surfarray.make_surface(state.frame.transpose(1, 0, 2)),
+                        (0, offset),
+                    )
+                    try:
+                        self.state.get_nowait()
+                    except _queue.Empty:
+                        pass
+                    finally:
+                        self.state.put(state)
+                    pygame.display.flip()
+                    pprint(state, self.print_output)
+
+                # update hint
                 try:
                     hint = self.hint.get_nowait()
                 except _queue.Empty:
@@ -191,4 +223,4 @@ if __name__ == "__main__":
         ]
         return "Recommended Action: {}".format(random.choice(actions))
 
-    Interface("FloorPlan14", (1600, 900), dummy_model, True)
+    Interface("FloorPlan10", (1600, 900), dummy_model, True)
