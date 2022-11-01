@@ -38,6 +38,8 @@ class Interface(Process):
         "Press [ESC] to quit",
         "Press [E] to open/close {fridge, cupboard, microwave ...}",
         "Press [F] to turn on/off {stove, microwave, coffee machine, ...}",
+        "Press [Q] to drop items in hand",
+        "Press [mouse] to pick up / put down / cut (with knife) objects",
     ]
     daemon: bool = True
     model: Callable[[ai2thor.server.Event], str]
@@ -177,6 +179,7 @@ class Interface(Process):
             for obj in state.metadata["objects"]
             if obj["toggleable"]
         }
+        has_knife = False
         self.state.put(state)
         agent = state.metadata["agent"]
         Interface.key_binding[pygame.K_r] = dict(  # add reset button
@@ -277,13 +280,22 @@ class Interface(Process):
                             for action in [
                                 "PutObject",
                                 "PickupObject",
+                                "SliceObject",
                             ]:
-                                state = controller.step(
-                                    action=action, objectId=objectId
-                                )
-                                pprint(state, stream=self.print_output)
-                                if state.metadata["lastActionSuccess"]:
-                                    break
+                                if action != "SliceObject" or has_knife:
+                                    state = controller.step(
+                                        action=action, objectId=objectId
+                                    )
+                                    pprint(state, stream=self.print_output)
+                                    if state.metadata["lastActionSuccess"]:
+                                        if action == "PutObject":
+                                            has_knife = False
+                                        elif (
+                                            action == "PickupObject"
+                                            and "Knife" in objectId
+                                        ):
+                                            has_knife = True
+                                        break
 
                 # handle mouse movement
                 x, y = pygame.mouse.get_pos()
@@ -384,4 +396,4 @@ if __name__ == "__main__":
         ]
         return "Recommended Action: {}".format(random.choice(actions))
 
-    Interface("FloorPlan10", (1600, 900), dummy_model, True)
+    Interface("FloorPlan10", (2400, 1350), dummy_model, True)
