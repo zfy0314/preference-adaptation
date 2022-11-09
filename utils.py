@@ -1,6 +1,7 @@
+from collections import namedtuple
 from multiprocessing import Process, Queue
 from types import SimpleNamespace
-from typing import List, Tuple
+from typing import Tuple
 
 Color = SimpleNamespace(
     white=(255, 255, 255),
@@ -49,45 +50,32 @@ class AsyncFuncWrapper(Process):
     def run(self):
 
         inputs = self.queue_in.get()
-        while inputs is not None:
+        res = True
+        while inputs is not None and res is not None:
             res = self.func(inputs)
             self.queue_out.put(res)
             inputs = self.queue_in.get()
             while not self.queue_in.empty() and inputs is not None:
                 inputs = self.queue_in.get()
+        print("Got None, exiting")
         self.queue_out.put(None)
 
 
-class TaskContentBase:
-    """
-    Base class for tutorials & experiment where ai2thor simulator is involved
-    """
-
-    def banner(self, state) -> str:
-        """A function that monitors the screen and output banner contents"""
-
-        raise NotImplementedError
-
-    def get_banner(self, queue_in: Queue, queue_out: Queue) -> AsyncFuncWrapper:
-
-        return AsyncFuncWrapper(self.banner, queue_in, queue_out)
-
-    def checklist(self, state) -> List[DecoratedString]:
-        """A function that monitors the screen and output checklist contents"""
-
-        raise NotImplementedError
-
-    def get_checklist(self, queue_in: Queue, queue_out: Queue) -> AsyncFuncWrapper:
-
-        return AsyncFuncWrapper(self.checklist, queue_in, queue_out)
-
-    @property
-    def ai2thor_floor_plan(self) -> str:
-        """Returns the floor plan used"""
-
-        return NotImplementedError
-
-    def ai2thor_init_steps(self) -> List[dict]:
-        """Returns actions of initialization"""
-
-        raise NotImplementedError
+Task = namedtuple(
+    "Task",
+    [
+        "name",
+        "banner_func",
+        "checklist_func",
+        "floor_plan",
+        "init_steps",
+        "instructions",
+    ],
+)
+Survey = namedtuple(
+    "Survey",
+    [
+        "name",
+        "question",
+    ],
+)

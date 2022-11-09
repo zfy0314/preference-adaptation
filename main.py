@@ -1,12 +1,12 @@
 import queue as _queue
 from multiprocessing import Queue
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import pygame
 from ai2thor.controller import Controller
 from ai2thor.platform import CloudRendering
 
-from utils import Color, DecoratedString, TaskContentBase
+from utils import AsyncFuncWrapper, Color, DecoratedString, Survey, Task
 
 
 class Interface:
@@ -33,7 +33,6 @@ class Interface:
 
     def __init__(self, width: int, height: int, log_file: str):
 
-        # initialization
         self.log_file = log_file
         pygame.init()
         self.simulator_width = width
@@ -43,6 +42,10 @@ class Interface:
         self.y_offset = self.simulator_height // 10
         self.overall_width = int(width * 1.2)
         self.overall_height = int(height * 1.1)
+        self.text_size_tiny = height // 25
+        self.text_size_small = height // 20
+        self.text_size_medium = height // 10
+        self.text_size_large = height // 5
         self.screen = pygame.display.set_mode((self.overall_width, self.overall_height))
         self.screen_center = (self.overall_width // 2, self.overall_height // 2)
         self.simulator_center = (
@@ -62,13 +65,36 @@ class Interface:
             self.x_offset,
             self.simulator_height,
         )
-        self.checklist_top_left = (self.simulator_width, self.y_offset)
+        self.checklist_top_left = (self.simulator_width + 5, self.y_offset + 5)
+        self.confirm_button_bbox = (
+            width - self.x_offset,
+            height - 2 * self.y_offset,
+            self.x_offset,
+            self.y_offset,
+        )
+        self.confirm_button_center = (
+            width - self.x_offset // 2,
+            height - self.y_offset - self.y_offset // 2,
+        )
+        self.survey_disagree_loc = (
+            self.overall_width // 2 - 1.8 * self.x_offset,
+            self.overall_height // 2 - self.text_size_medium,
+        )
+        self.survey_agree_loc = (
+            self.overall_width // 2 + 1.8 * self.x_offset,
+            self.overall_height // 2 - self.text_size_medium,
+        )
+        self.survey_button_locs = [
+            (self.overall_width // 2 - 1.8 * self.x_offset, self.overall_height // 2),
+            (self.overall_width // 2 - 1.2 * self.x_offset, self.overall_height // 2),
+            (self.overall_width // 2 - 0.6 * self.x_offset, self.overall_height // 2),
+            (self.overall_width // 2, self.overall_height // 2),
+            (self.overall_width // 2 + 0.6 * self.x_offset, self.overall_height // 2),
+            (self.overall_width // 2 + 1.2 * self.x_offset, self.overall_height // 2),
+            (self.overall_width // 2 + 1.8 * self.x_offset, self.overall_height // 2),
+        ]
         pygame.key.set_repeat(30)
 
-        self.text_size_tiny = height // 25
-        self.text_size_small = height // 20
-        self.text_size_medium = height // 10
-        self.text_size_large = height // 5
         self.mktext_tiny = pygame.font.SysFont(None, self.text_size_tiny).render
         self.mktext_small = pygame.font.SysFont(None, self.text_size_small).render
         self.mktext_medium = pygame.font.SysFont(None, self.text_size_medium).render
@@ -86,10 +112,17 @@ class Interface:
             pygame.K_q: dict(action="ThrowObject", moveMagnitude=20, forceAction=True),
         }
 
-    def run_all(self, tasks: List[TaskContentBase]):
+    def run_all(self, tasks: List[Union[Task, Survey, List]]):
 
-        for content in tasks:
-            self.run_task(content)
+        for task in tasks:
+            if isinstance(task, Task):
+                self.run_task(task)
+            elif isinstance(task, Survey):
+                self.show_survey(task)
+            elif isinstance(task, list):
+                self.show_instructions(task)
+            else:
+                raise NotImplementedError
 
     def show_loading(self, text: str):
 
@@ -129,19 +162,20 @@ class Interface:
             text = self.mktext_tiny(object_name.split("|")[0], True, Color.white)
             self.screen.blit(text, self.simulator_center_right)
 
-    def run_task(self, content: TaskContentBase):
+    def run_task(self, task: Task):
 
         # initialization
         self.show_loading("Loading")
-        pygame.mouse.set_visible(False)
         keyclick = pygame.time.Clock()
-        self.banner = content.get_banner(self.pipe_to_banner, self.pipe_from_banner)
-        self.checklist = content.get_checklist(
-            self.pipe_to_checklist, self.pipe_from_checklist
+        self.banner = AsyncFuncWrapper(
+            task.banner_func, self.pipe_to_banner, self.pipe_from_banner
+        )
+        self.checklist = AsyncFuncWrapper(
+            task.checklist_func, self.pipe_to_checklist, self.pipe_from_checklist
         )
         self.controller = Controller(
             platform=CloudRendering,
-            scene=content.ai2thor_floor_plan,
+            scene=task.floor_plan,
             width=self.simulator_width,
             height=self.simulator_height,
             gridSize=0.05,
@@ -149,7 +183,7 @@ class Interface:
             fieldOfView=60,
         )
         self.state = self.controller.step(action="Teleport")
-        for action in content.ai2thor_init_steps:
+        for action in task.init_steps:
             self.state = self.controller.step(**action)
         self.banner_text = ""
         self.checklist_text = []
@@ -174,15 +208,18 @@ class Interface:
         self.pipe_to_checklist.put(self.state)
         banner = self.pipe_from_banner.get()
         checklist = self.pipe_from_checklist.get()
-        self.update_banner(banner)
-        self.update_checklist(checklist)
 
         # loop
+        if task.instructions is not None:
+            self.show_instructions(task.instructions)
+        pygame.mouse.set_visible(False)
+        self.update_banner(banner)
+        self.update_checklist(checklist)
         try:
             while banner is not None and checklist is not None:
 
                 old_state = self.state
-                query = self.controller.step(action="GetObjectInFrame", x=0.5, y=0.5)
+                query = self.controller.step(action="GetObjectInFrame", x=0.5, y=0.48)
                 objectId = query.metadata["actionReturn"] if query else None
 
                 # handle keyboard & mouse click
@@ -255,13 +292,19 @@ class Interface:
                 except _queue.Empty:
                     pass
                 else:
-                    self.update_banner(banner)
+                    if banner is None:
+                        raise KeyboardInterrupt
+                    else:
+                        self.update_banner(banner)
                 try:
                     checklist = self.pipe_from_checklist.get_nowait()
                 except _queue.Empty:
                     pass
                 else:
-                    self.update_checklist(checklist)
+                    if checklist is None:
+                        raise KeyboardInterrupt
+                    else:
+                        self.update_checklist(checklist)
                 pygame.display.flip()
 
         except KeyboardInterrupt:
@@ -270,38 +313,134 @@ class Interface:
         # clean up
         self.clean_up(close=False)
 
+    def show_survey(self, survey: Survey) -> int:
+
+        self.screen.fill(Color.white)
+        pygame.mouse.set_visible(True)
+        text = self.mktext_medium("    " + survey.question, True, Color.black)
+        self.screen.blit(text, self.simulator_top_left)
+        button_rects = []
+        for i, center in enumerate(self.survey_button_locs):
+            text = self.mktext_medium("  {}  ".format(i + 1), True, Color.white)
+            button_rects.append(text.get_rect(center=center))
+        text = self.mktext_small("strongly agree", True, Color.gray1)
+        self.screen.blit(text, text.get_rect(center=self.survey_agree_loc))
+        text = self.mktext_small("strongly disagree", True, Color.gray1)
+        self.screen.blit(text, text.get_rect(center=self.survey_disagree_loc))
+
+        # wait till the participant click on the button
+        text = self.mktext_medium("  confirm  ", True, Color.white)
+        text_rect = text.get_rect(center=self.confirm_button_center)
+        left, top, width, height = tuple(text_rect)
+        self.screen.blit(text, text_rect)
+        inbox = (
+            lambda mouse, rect: rect[0] <= mouse[0]
+            and mouse[0] <= rect[0] + rect[2]
+            and rect[1] <= mouse[1]
+            and mouse[1] <= rect[1] + rect[3]
+        )
+        res = -1
+        try:
+            while True:
+
+                for i, bbox in enumerate(button_rects):
+                    if i == res:
+                        pygame.draw.rect(self.screen, Color.black, bbox)
+                    else:
+                        if inbox(pygame.mouse.get_pos(), bbox):
+                            pygame.draw.rect(self.screen, Color.gray1, bbox)
+                        else:
+                            pygame.draw.rect(self.screen, Color.gray2, bbox)
+
+                if inbox(pygame.mouse.get_pos(), text_rect):
+                    if res == -1:
+                        pygame.draw.rect(self.screen, Color.gray1, text_rect)
+                    else:
+                        pygame.draw.rect(self.screen, Color.black, text_rect)
+                else:
+                    pygame.draw.rect(self.screen, Color.gray2, text_rect)
+                self.screen.blit(text, text_rect)
+                pygame.display.flip()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        pos = pygame.mouse.get_pos()
+                        if inbox(pos, text_rect) and res != -1:
+                            raise KeyboardInterrupt
+                        for i, bbox in enumerate(button_rects):
+                            if inbox(pos, bbox):
+                                res = i
+
+        except KeyboardInterrupt:
+            pass
+
+    def show_instructions(self, instructions: List[str]):
+
+        # add instructions
+        self.screen.fill(Color.white)
+        pygame.mouse.set_visible(True)
+        left, top = self.simulator_top_left
+        left += 5
+        top += 5
+        for instruction in instructions:
+            text = self.mktext_medium(instruction, True, Color.black)
+            self.screen.blit(text, (left, top))
+            top += self.text_size_medium
+
+        # wait till the participant click on the button
+        text = self.mktext_medium(" continue ", True, Color.white)
+        text_rect = text.get_rect(center=self.confirm_button_center)
+        left, top, width, height = tuple(text_rect)
+        self.screen.blit(text, text_rect)
+        inbox = (
+            lambda x, y: left <= x
+            and x <= left + width
+            and top <= y
+            and y <= top + height
+        )
+        try:
+            while True:
+
+                # add button
+                if inbox(*pygame.mouse.get_pos()):
+                    pygame.draw.rect(self.screen, Color.black, text_rect)
+                else:
+                    pygame.draw.rect(self.screen, Color.gray1, text_rect)
+                self.screen.blit(text, (left, top))
+                pygame.display.flip()
+
+                for event in pygame.event.get():
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if inbox(*pygame.mouse.get_pos()):
+                            raise KeyboardInterrupt
+
+        except KeyboardInterrupt:
+            pass
+
     def clean_up(self, close: bool = False):
 
         self.show_loading("cleaning up")
-        try:
-            self.pipe_to_banner.put(None)
-        except EOFError:
-            pass
-        try:
-            self.pipe_to_checklist.put(None)
-        except EOFError:
-            pass
-        self.banner.join()
-        self.checklist.join()
-        while not self.pipe_from_banner.empty():
-            _ = self.pipe_from_banner.get()
-        while not self.pipe_for_checklist.empty():
-            _ = self.pipe_for_checklist.get()
-        while not self.pipe_to_banner.empty():
-            _ = self.pipe_to_banner.get()
-        while not self.pipe_to_checklist.empty():
-            _ = self.pipe_to_checklist.get()
+        self.banner.kill()
+        self.checklist.kill()
+        self.pipe_to_banner.close()
+        self.pipe_from_banner.close()
+        self.pipe_to_checklist.close()
+        self.pipe_from_checklist.close()
 
         if close:
-            self.pipe_to_banner.close()
-            self.pipe_to_checklist.close()
             pygame.display.quit()
             pygame.quit()
+        else:
+            self.pipe_to_banner = Queue()
+            self.pipe_from_banner = Queue()
+            self.pipe_to_checklist = Queue()
+            self.pipe_from_checklist = Queue()
 
 
 if __name__ == "__main__":
 
-    from dummy import Dummy
+    from dummy import dummy_postsurvey, dummy_presurvey, dummy_task
 
     E = Interface(1600, 900, "log")
-    E.run_all([Dummy()])
+    E.run_all([dummy_presurvey, dummy_task, dummy_postsurvey])
+    E.clean_up(close=True)
