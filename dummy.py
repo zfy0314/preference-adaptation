@@ -17,16 +17,64 @@ actions = [
     "Make Coffee",
     "Walk to Chair",
 ]
+coffee_actions = [
+    "Find Mug",
+    "Pickup Mug (click mouse)",
+    "Put Mug in Coffee Maker (click mouse)",
+    "Start Coffee Maker (press [F])",
+]
+delayed_pick = lambda arr: arr[fib(randint(30, 40)) % len(arr) - randint(0, len(arr))]
 
-dummy_presurvey = Survey(
-    name="presurvey", question="You have interacted with AI2THOR before"
+presurvey1 = Survey(
+    name="presurvey1", question="You have interacted with AI2THOR before"
 )
-dummy_postsurvey = Survey(name="postsurvey", question="The simulator is easy to use")
+presurvey2 = Survey(
+    name="presurvey2", question="You prepare breakfast for yourself a lot"
+)
+postsurvey1 = Survey(name="postsurvey1", question="The task is easy")
+postsurvey2 = Survey(
+    name="postsurvey2", question="The suggestions provided by the agent is helpful"
+)
 
-dummy_task = Task(
-    name="dummy",
-    banner_func=lambda _: "Recommended action: "
-    + actions[fib(randint(30, 40)) % len(actions) - randint(0, len(actions))],
+instructions = [
+    "Instructions:",
+    "Press [ESC] to quit",
+    "Press [E] to open/close {fridge, cupboard, microwave ...}",
+    "Press [F] to turn on/off {stove, microwave, coffee machine, ...}",
+    "Press [Q] to drop items in hand",
+    "Press [mouse] to pick up / put down / cut (with knife) objects",
+]
+tutorial = Task(
+    name="tutorial",
+    banner_func=lambda _: delayed_pick(coffee_actions),
+    checklist_func=lambda _: [
+        DecoratedString("Make coffee", Color.black),
+    ],
+    floor_plan="FloorPlan5",
+    init_steps=[],
+    instructions=[
+        "Lets go through a tutorial of using the Coffee Machine",
+    ],
+)
+train = Task(
+    name="train",
+    banner_func=lambda _: "",
+    checklist_func=lambda _: [
+        DecoratedString("Make coffee", Color.black),
+        DecoratedString("  Place mug in coffee maker", Color.black),
+        DecoratedString("Make sandwich", Color.black),
+        DecoratedString("  Cut the bread & lettuce & tomota", Color.black),
+        DecoratedString("  Assemble the sandich", Color.black),
+    ],
+    floor_plan="FloorPlan5",
+    init_steps=[],
+    instructions=[
+        "Now try to make a breakfast by yourself",
+    ],
+)
+baseline = Task(
+    name="baseline",
+    banner_func=lambda _: "Recommended action: " + delayed_pick(actions),
     checklist_func=lambda _: [
         DecoratedString("Make coffee", Color.black),
         DecoratedString("  Place mug in coffee maker", Color.black),
@@ -37,11 +85,39 @@ dummy_task = Task(
     floor_plan="FloorPlan10",
     init_steps=[],
     instructions=[
-        "Instructions:",
-        "Press [ESC] to quit",
-        "Press [E] to open/close {fridge, cupboard, microwave ...}",
-        "Press [F] to turn on/off {stove, microwave, coffee machine, ...}",
-        "Press [Q] to drop items in hand",
-        "Press [mouse] to pick up / put down / cut (with knife) objects",
+        "You are at a new kitchen, and a agent",
+        "will assisst you by providing suggestions",
     ],
 )
+personalized = Task(
+    name="personalized",
+    banner_func=lambda _: "Recommended action: " + delayed_pick(actions),
+    checklist_func=lambda _: [
+        DecoratedString("Make coffee", Color.black),
+        DecoratedString("  Place mug in coffee maker", Color.black),
+        DecoratedString("Make sandwich", Color.black),
+        DecoratedString("  Cut the bread & lettuce & tomota", Color.black),
+        DecoratedString("  Assemble the sandich", Color.black),
+    ],
+    floor_plan="FloorPlan14",
+    init_steps=[],
+    instructions=[
+        "You are at another new kitchen, and a",
+        "different agent will assisst you",
+        "by providing suggestions",
+    ],
+)
+
+dummy_procedures = [
+    presurvey1,
+    presurvey2,
+    instructions,
+    tutorial,
+    train,
+    baseline,
+    postsurvey1,
+    postsurvey2,
+    personalized,
+    postsurvey1,
+    postsurvey2,
+]

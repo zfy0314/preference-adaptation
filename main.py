@@ -2,8 +2,8 @@ import queue as _queue
 from multiprocessing import Queue
 from typing import List, Optional, Union
 
+import ai2thor.controller as controller
 import pygame
-from ai2thor.controller import Controller
 from ai2thor.platform import CloudRendering
 
 from utils import AsyncFuncWrapper, Color, DecoratedString, Survey, Task
@@ -109,7 +109,10 @@ class Interface:
             pygame.K_a: dict(action="MoveLeft"),
             pygame.K_s: dict(action="MoveBack"),
             pygame.K_d: dict(action="MoveRight"),
+        }
+        self.discrete_key_binding = {
             pygame.K_q: dict(action="ThrowObject", moveMagnitude=20, forceAction=True),
+            # pygame.K_r: dict(action="RotateHeldObject", pitch=90, yaw=0, roll=0),
         }
 
     def run_all(self, tasks: List[Union[Task, Survey, List]]):
@@ -173,7 +176,7 @@ class Interface:
         self.checklist = AsyncFuncWrapper(
             task.checklist_func, self.pipe_to_checklist, self.pipe_from_checklist
         )
-        self.controller = Controller(
+        self.controller = controller.Controller(
             platform=CloudRendering,
             scene=task.floor_plan,
             width=self.simulator_width,
@@ -239,6 +242,10 @@ class Interface:
                                     action_dict[objectId] = (alternative, action)
                                     action = dict(action=action, objectId=objectId)
                                 except KeyError:
+                                    action = self.discrete_key_binding.get(
+                                        event.key, None
+                                    )
+
                                     # quit
                                     if event.key == pygame.K_ESCAPE:
                                         raise KeyboardInterrupt
@@ -383,7 +390,7 @@ class Interface:
         left += 5
         top += 5
         for instruction in instructions:
-            text = self.mktext_medium(instruction, True, Color.black)
+            text = self.mktext_medium("  " + instruction, True, Color.black)
             self.screen.blit(text, (left, top))
             top += self.text_size_medium
 
@@ -439,8 +446,8 @@ class Interface:
 
 if __name__ == "__main__":
 
-    from dummy import dummy_postsurvey, dummy_presurvey, dummy_task
+    from dummy import dummy_procedures
 
     E = Interface(1600, 900, "log")
-    E.run_all([dummy_presurvey, dummy_task, dummy_postsurvey])
+    E.run_all(dummy_procedures)
     E.clean_up(close=True)
