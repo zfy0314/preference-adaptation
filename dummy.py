@@ -4,19 +4,23 @@ from utils import Color, DecoratedString, Survey, Task
 
 fib = lambda x: x if x < 2 else fib(x - 1) + fib(x - 2)
 actions = [
-    "Get Mug",
     "Get Lettuce",
     "Get Bread",
+    "Get Tomato",
+    "Get Mug",
     "Get Plate",
     "Get Knife",
-    "Get Tomato",
     "Cut Lettuce",
     "Cut Bread",
-    "Cut Lettuce",
     "Cut Tomato",
-    "Make Coffee",
+    "Put Lettuce on Plate",
+    "Put Bread on Plate",
+    "Put Tomato on Plate",
     "Walk to Chair",
+    "Walk to Coffee Machine",
+    "Turn on Coffee Machine",
 ]
+# Actions for tutorial
 coffee_actions = [
     "Find Mug",
     "Pickup Mug (click mouse)",
