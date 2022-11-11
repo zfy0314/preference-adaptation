@@ -13,12 +13,12 @@ actions = [
     "Cut Lettuce",
     "Cut Bread",
     "Cut Tomato",
-    "Put Lettuce on Plate",
-    "Put Bread on Plate",
-    "Put Tomato on Plate",
-    "Walk to Chair",
+    "Place Lettuce on Bread" "Place Slice of Bread",
+    "Place Tomato on Bread" "Bring Sandwich to Chair",
     "Walk to Coffee Machine",
     "Turn on Coffee Machine",
+    "Wait for Coffee to Brew",
+    "Bring Coffee to Chair",
 ]
 # Actions for tutorial
 coffee_actions = [
@@ -90,7 +90,7 @@ baseline = Task(
     init_steps=[],
     instructions=[
         "You are at a new kitchen, and a agent",
-        "will assisst you by providing suggestions",
+        "will assist you by providing suggestions",
     ],
 )
 personalized = Task(
@@ -107,7 +107,7 @@ personalized = Task(
     init_steps=[],
     instructions=[
         "You are at another new kitchen, and a",
-        "different agent will assisst you",
+        "different agent will assist you",
         "by providing suggestions",
     ],
 )

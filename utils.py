@@ -2,6 +2,7 @@ from collections import namedtuple
 from multiprocessing import Process, Queue
 from types import SimpleNamespace
 from typing import Tuple
+from time import time
 
 Color = SimpleNamespace(
     white=(255, 255, 255),
@@ -11,6 +12,28 @@ Color = SimpleNamespace(
     green=(0, 255, 0),
     red=(255, 0, 0),
 )
+
+
+class Logger:
+    def __init__(self, log_file: str):
+        self.log_file = log_file
+        self.actions = {}
+        self.surveys = {}
+
+    def log_action(self, task: str, action: dict):
+        try:
+            self.actions[task].append((time(), action))
+        except KeyError:
+            self.actions[task] = [(time(), action)]
+
+    def log_survey(self, survey: str, res: int):
+        self.surveys[survey] = (time(), res)
+
+    def save(self):
+        pickle.dump(
+            dict(actions=self.actions, surveys=self.surveys),
+            open(self.log_file, "wb"),
+        )
 
 
 class DecoratedString:

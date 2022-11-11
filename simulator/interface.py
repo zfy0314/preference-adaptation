@@ -396,4 +396,5 @@ if __name__ == "__main__":
         ]
         return "Recommended Action: {}".format(random.choice(actions))
 
-    Interface("FloorPlan10", (2400, 1350), dummy_model, True)
+    # Interface("FloorPlan10", (2400, 1350), dummy_model, True)
+    Interface("FloorPlan10", (1600, 1000), dummy_model, True)

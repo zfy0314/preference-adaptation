@@ -1,12 +1,15 @@
 import queue as _queue
 from multiprocessing import Queue
 from typing import List, Optional, Union
+from random import shuffle
+from time import time
 
+import fire
 import ai2thor.controller as controller
 import pygame
 from ai2thor.platform import CloudRendering
 
-from utils import AsyncFuncWrapper, Color, DecoratedString, Survey, Task
+from utils import AsyncFuncWrapper, Color, DecoratedString, Survey, Task, Logger
 
 
 class Interface:
@@ -33,7 +36,7 @@ class Interface:
 
     def __init__(self, width: int, height: int, log_file: str):
 
-        self.log_file = log_file
+        self.logger = Logger(log_file)
         pygame.init()
         self.simulator_width = width
         self.simulator_height = height
@@ -125,7 +128,7 @@ class Interface:
             elif isinstance(task, list):
                 self.show_instructions(task)
             else:
-                raise NotImplementedError
+                print("skipping: ", task)
 
     def show_loading(self, text: str):
 
@@ -251,6 +254,7 @@ class Interface:
                                         raise KeyboardInterrupt
                         finally:
                             if action is not None:
+                                self.logger.log_action(action)
                                 self.state = self.controller.step(**action)
 
                     elif event.type == pygame.MOUSEBUTTONDOWN and objectId is not None:
@@ -264,6 +268,7 @@ class Interface:
                                     action=action, objectId=objectId
                                 )
                                 if self.state.metadata["lastActionSuccess"]:
+                                    self.logger.log_action(action)
                                     has_knife = (
                                         has_knife and not action == "PutObject"
                                     ) or (
@@ -276,17 +281,17 @@ class Interface:
                 dx, dy = x - self.simulator_center[0], y - self.simulator_center[1]
                 pygame.mouse.set_pos(self.simulator_center)
                 if dx != 0:
-                    self.state = self.controller.step(
-                        action="RotateRight", degrees=0.3 * dx
-                    )
+                    action = dict(action="RotateRight", degress=0.3 * dx)
+                    self.logger.log_action(action)
+                    self.state = self.controller.step(action)
                 if dy > 0:
-                    self.state = self.controller.step(
-                        action="LookDown", degrees=abs(0.3 * dy)
-                    )
+                    action = dict(action="LookDown", degrees=abs(0.3 * dy))
+                    self.logger.log_action(action)
+                    self.state = self.controller.step(action)
                 elif dy < 0:
-                    self.state = self.controller.step(
-                        action="LookUp", degrees=abs(0.3 * dy)
-                    )
+                    action = dict(action="LookUp", degrees=abs(0.3 * dy))
+                    self.logger.log_action(action)
+                    self.state = self.controller.step(action)
                 pygame.mouse.set_pos(self.simulator_center)
 
                 # update display
@@ -318,6 +323,7 @@ class Interface:
             pass
 
         # clean up
+        self.logger.save()
         self.clean_up(close=False)
 
     def show_survey(self, survey: Survey) -> int:
@@ -380,6 +386,8 @@ class Interface:
 
         except KeyboardInterrupt:
             pass
+        except:
+            self.logger.log_survey(survey.name, res)
 
     def show_instructions(self, instructions: List[str]):
 
@@ -444,10 +452,47 @@ class Interface:
             self.pipe_from_checklist = Queue()
 
 
-if __name__ == "__main__":
-
+def dummy():
     from dummy import dummy_procedures
 
-    E = Interface(1600, 900, "log")
+    E = Interface(1440, 810, "log")
     E.run_all(dummy_procedures)
     E.clean_up(close=True)
+
+
+def experiment(trial: int):
+
+    all_floor_plans = ["FloorPlan14"] * 5  # TODO: change to actual
+    all_strategies = ["Coffee_first"] * 5  # TODO: change to actual
+    shuffle(all_floor_plans)
+    shuffle(all_strategies)
+    tasks = [
+        Task(
+            name=floor_plan + " " + strategy,
+            banner_func=get_strategy(strategy),
+            checklist_func=get_checklist(floor_plan),
+            floor_plan=floor_plan,
+            init_steps=get_init_steps(floor_plan),
+            instructions=[
+                "You are now in a new kitchen, and you are making the same breakfast.",
+                "A new agent will provide optional suggestions on what to do next.",
+            ],
+        )
+        for floor_plan, strategy in zip(all_floor_plans, all_strategies)
+    ]
+
+    procedures = [
+        *tutorials,
+        training,
+        *post_train_surveys,
+        *sum([[task] + post_train_surveys for task in tasks], []),
+    ]
+    E = Interface(
+        1440, 810, "results/result_participant_{:02d}-{}.pkl".format(trial, time())
+    )
+    E.run_all(procedures)
+    E.clean_up(close=True)
+
+
+if __name__ == "__main__":
+    fire.Fire()
