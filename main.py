@@ -453,6 +453,7 @@ class Interface:
 
 
 def dummy():
+
     from dummy import dummy_procedures
 
     E = Interface(1440, 810, "log")
@@ -462,14 +463,18 @@ def dummy():
 
 def experiment(trial: int):
 
-    all_floor_plans = ["FloorPlan14"] * 5  # TODO: change to actual
-    all_strategies = ["Coffee_first"] * 5  # TODO: change to actual
+    from models import get_model
+    from checklist import get_checklist
+    from survey import post_train_surveys, post_task_surveys
+
+    all_floor_plans = ["FloorPlan" + str(x) for x in range(10, 15)]
+    all_strategies = ["coffee_first"] * 5  # TODO: change to actual
     shuffle(all_floor_plans)
     shuffle(all_strategies)
     tasks = [
         Task(
             name=floor_plan + " " + strategy,
-            banner_func=get_strategy(strategy),
+            banner_func=get_model(floor_plan, strategy),
             checklist_func=get_checklist(floor_plan),
             floor_plan=floor_plan,
             init_steps=get_init_steps(floor_plan),
