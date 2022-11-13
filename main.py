@@ -1,15 +1,17 @@
+import pdb
 import queue as _queue
 from multiprocessing import Queue
-from typing import List, Optional, Union
+from pprint import pprint
 from random import shuffle
-from time import time
+from time import sleep, time
+from typing import List, Optional, Union
 
-import fire
 import ai2thor.controller as controller
+import fire
 import pygame
 from ai2thor.platform import CloudRendering
 
-from utils import AsyncFuncWrapper, Color, DecoratedString, Survey, Task, Logger
+from utils import AsyncFuncWrapper, Color, DecoratedString, Logger, Survey, Task
 
 
 class Interface:
@@ -115,7 +117,7 @@ class Interface:
         }
         self.discrete_key_binding = {
             pygame.K_q: dict(action="ThrowObject", moveMagnitude=20, forceAction=True),
-            # pygame.K_r: dict(action="RotateHeldObject", pitch=90, yaw=0, roll=0),
+            pygame.K_r: dict(action="RotateHeldObject", pitch=90, yaw=0, roll=0),
         }
 
     def run_all(self, tasks: List[Union[Task, Survey, List]]):
@@ -157,16 +159,108 @@ class Interface:
                 self.screen.blit(text, (left, top))
             self.checklist_text = texts
 
-    def update_simulator(self, object_name: Optional[str]):
+    def update_simulator(self, object_meta: Optional[dict] = None):
 
         image = self.state.frame.transpose((1, 0, 2))
         self.screen.blit(pygame.surfarray.make_surface(image), self.simulator_top_left)
         pygame.draw.circle(
             self.screen, Color.white, self.simulator_center, self.dot_size
         )
-        if object_name is not None:
-            text = self.mktext_tiny(object_name.split("|")[0], True, Color.white)
+        text_x, text_y = self.simulator_center_right
+        if object_meta is not None:
+            text = self.mktext_tiny(object_meta["objectType"], True, Color.white)
             self.screen.blit(text, self.simulator_center_right)
+            text_y += self.text_size_tiny
+            if object_meta["openable"]:
+                text = self.mktext_tiny("[press E] to open/close", True, Color.white)
+                self.screen.blit(text, (text_x, text_y))
+                text_y += self.text_size_tiny
+            if object_meta["toggleable"]:
+                text = self.mktext_tiny("[press F] to toggle on/off", True, Color.white)
+                self.screen.blit(text, (text_x, text_y))
+                text_y += self.text_size_tiny
+            if self.object_in_hand is None:
+                if object_meta["pickupable"]:
+                    text = self.mktext_tiny(
+                        "[click mouse] to pick up", True, Color.white
+                    )
+                    self.screen.blit(text, (text_x, text_y))
+                    text_y += self.text_size_tiny
+            else:
+                if self.has_knife and object_meta["sliceable"]:
+                    text = self.mktext_tiny("[click mouse] to slice", True, Color.white)
+                    self.screen.blit(text, (text_x, text_y))
+                    text_y += self.text_size_tiny
+                elif object_meta["receptacle"]:
+                    text = self.mktext_tiny(
+                        "[click mouse] to put down", True, Color.white
+                    )
+                    self.screen.blit(text, (text_x, text_y))
+                    text_y += self.text_size_tiny
+
+    def set_object_pose(self, positions: dict, rotations: dict):
+
+        objects = [
+            dict(
+                objectName=x["name"],
+                position=positions.get(x["objectId"], x["position"]),
+                rotation=rotations.get(x["objectId"], x["rotation"]),
+            )
+            for x in self.state.metadata["objects"]
+            if x["moveable"] or x["pickupable"]
+        ]
+        self.state = self.controller.step(action="SetObjectPoses", objectPoses=objects)
+
+    def handle_mouse_click(self, objectId: str):
+
+        if self.object_in_hand is None:
+            state = self.controller.step(action="PickupObject", objectId=objectId)
+            if state.metadata["lastActionSuccess"]:
+                self.state = state
+                self.object_in_hand = objectId
+                self.has_knife = "Knife" in objectId
+        else:
+            if self.has_knife and self.state.get_object(objectId)["sliceable"]:
+                self.state = self.controller.step(
+                    action="SliceObject", objectId=objectId
+                )
+            else:
+                state = self.controller.step(action="PutObject", objectId=objectId)
+                if state.metadata["lastActionSuccess"]:
+                    self.state = state
+                    if "Slice" in self.object_in_hand:
+                        current_object = self.state.get_object(self.object_in_hand)
+                        target_object = self.state.get_object(objectId)
+                        target_bbox = target_object["axisAlignedBoundingBox"]
+                        rotation = current_object["rotation"]
+                        position = current_object["position"]
+                        rotation["x"] = 90
+                        position["y"] = (
+                            max(pt[1] for pt in target_bbox["cornerPoints"])
+                            + target_bbox["size"]["y"] / 2
+                        )
+                        self.set_object_pose(
+                            {self.object_in_hand: position},
+                            {self.object_in_hand: rotation},
+                        )
+                    self.object_in_hand = None
+                    self.has_knife = False
+                elif "Slice" in self.object_in_hand and "Slice" in objectId:
+                    position_pointing = self.controller.step(
+                        action="GetCoordinateFromRaycast",
+                        x=0.50,
+                        y=0.48,
+                    ).metadata["actionReturn"]
+                    self.set_object_pose(
+                        {self.object_in_hand: position_pointing},
+                        {self.object_in_hand: dict(x=90, y=0, z=0)},
+                    )
+                    self.state = self.controller.step(
+                        action="DropHandObject", forceAction=True
+                    )
+                    self.object_in_hand = None
+                    self.has_knife = False
+                pprint(state)
 
     def run_task(self, task: Task):
 
@@ -207,7 +301,8 @@ class Interface:
                 if obj["toggleable"]
             },
         }
-        has_knife = False
+        self.object_in_hand = None
+        self.has_knife = False
 
         # load up models
         self.pipe_to_banner.put(self.state)
@@ -252,29 +347,16 @@ class Interface:
                                     # quit
                                     if event.key == pygame.K_ESCAPE:
                                         raise KeyboardInterrupt
+                                    elif event.key == pygame.K_p:
+                                        pdb.set_trace()
                         finally:
                             if action is not None:
                                 self.logger.log_action(action)
                                 self.state = self.controller.step(**action)
 
                     elif event.type == pygame.MOUSEBUTTONDOWN and objectId is not None:
-                        for action in [
-                            "PutObject",
-                            "PickupObject",
-                            "SliceObject",
-                        ]:
-                            if action != "SliceObject" or has_knife:
-                                self.state = self.controller.step(
-                                    action=action, objectId=objectId
-                                )
-                                if self.state.metadata["lastActionSuccess"]:
-                                    self.logger.log_action(action)
-                                    has_knife = (
-                                        has_knife and not action == "PutObject"
-                                    ) or (
-                                        action == "PickupObject" and "Knife" in objectId
-                                    )
-                                    break
+
+                        self.handle_mouse_click(objectId)
 
                 # handle mouse movement
                 x, y = pygame.mouse.get_pos()
@@ -298,7 +380,7 @@ class Interface:
                 self.pipe_to_banner.put(self.state)
                 self.pipe_to_checklist.put(self.state)
                 if old_state != self.state:
-                    self.update_simulator(objectId)
+                    self.update_simulator(self.state.get_object(objectId))
                 try:
                     banner = self.pipe_from_banner.get_nowait()
                 except _queue.Empty:
@@ -386,7 +468,7 @@ class Interface:
 
         except KeyboardInterrupt:
             pass
-        except:
+        finally:
             self.logger.log_survey(survey.name, res)
 
     def show_instructions(self, instructions: List[str]):
@@ -463,9 +545,9 @@ def dummy():
 
 def experiment(trial: int):
 
-    from models import get_model
     from checklist import get_checklist
-    from survey import post_train_surveys, post_task_surveys
+    from models import get_model
+    from survey import post_task_surveys, post_train_surveys
 
     all_floor_plans = ["FloorPlan" + str(x) for x in range(10, 15)]
     all_strategies = ["coffee_first"] * 5  # TODO: change to actual
