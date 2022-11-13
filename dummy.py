@@ -51,10 +51,12 @@ instructions = [
 tutorial = Task(
     name="tutorial",
     banner_func=lambda _: delayed_pick(coffee_actions),
-    checklist_func=lambda _: [DecoratedString("Make coffee", Color.black),],
+    checklist_func=lambda _: [
+        DecoratedString("Make coffee", Color.black),
+    ],
     floor_plan="FloorPlan5",
     init_steps=[],
-    instructions=["Lets go through a tutorial of using the Coffee Machine",],
+    instructions=["Lets go through a tutorial of using the Coffee Machine"],
 )
 train = Task(
     name="train",
@@ -68,7 +70,7 @@ train = Task(
     ],
     floor_plan="FloorPlan5",
     init_steps=[],
-    instructions=["Now try to make a breakfast by yourself",],
+    instructions=["Now try to make a breakfast by yourself"],
 )
 baseline = Task(
     name="baseline",

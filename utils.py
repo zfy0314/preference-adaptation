@@ -1,9 +1,9 @@
+import json
 from collections import namedtuple
 from multiprocessing import Process, Queue
+from time import time
 from types import SimpleNamespace
 from typing import Tuple
-from time import time
-import json
 
 Color = SimpleNamespace(
     white=(255, 255, 255),
@@ -32,13 +32,16 @@ class Logger:
 
     def save(self):
         json.dump(
-            dict(actions=self.actions, surveys=self.surveys), open(self.log_file, "w"),
+            dict(actions=self.actions, surveys=self.surveys),
+            open(self.log_file, "w"),
         )
 
 
 class DecoratedString:
     def __init__(
-        self, text: str, color: Tuple[int, int, int],
+        self,
+        text: str,
+        color: Tuple[int, int, int],
     ):
         self.text = text
         self.color = color
@@ -93,4 +96,4 @@ Task = namedtuple(
         "instructions",
     ],
 )
-Survey = namedtuple("Survey", ["name", "question",],)
+Survey = namedtuple("Survey", ["name", "question"])

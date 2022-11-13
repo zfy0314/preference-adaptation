@@ -351,7 +351,7 @@ class Interface:
                                         pdb.set_trace()
                         finally:
                             if action is not None:
-                                self.logger.log_action(action)
+                                self.logger.log_action(task.name, action)
                                 self.state = self.controller.step(**action)
 
                     elif event.type == pygame.MOUSEBUTTONDOWN and objectId is not None:
@@ -363,16 +363,16 @@ class Interface:
                 dx, dy = x - self.simulator_center[0], y - self.simulator_center[1]
                 pygame.mouse.set_pos(self.simulator_center)
                 if dx != 0:
-                    action = dict(action="RotateRight", degress=0.3 * dx)
-                    self.logger.log_action(action)
+                    action = dict(action="RotateRight", degrees=0.3 * dx)
+                    self.logger.log_action(task.name, action)
                     self.state = self.controller.step(action)
                 if dy > 0:
                     action = dict(action="LookDown", degrees=abs(0.3 * dy))
-                    self.logger.log_action(action)
+                    self.logger.log_action(task.name, action)
                     self.state = self.controller.step(action)
                 elif dy < 0:
                     action = dict(action="LookUp", degrees=abs(0.3 * dy))
-                    self.logger.log_action(action)
+                    self.logger.log_action(task.name, action)
                     self.state = self.controller.step(action)
                 pygame.mouse.set_pos(self.simulator_center)
 
@@ -538,8 +538,26 @@ def dummy():
 
     from dummy import dummy_procedures
 
-    E = Interface(1440, 810, "log")
+    E = Interface(1440, 810, "log.json")
     E.run_all(dummy_procedures)
+    E.clean_up(close=True)
+
+
+def tour(floor_plan: str = "FloorPlan10"):
+
+    task = Task(
+        name="baseline",
+        banner_func=lambda _: "",
+        checklist_func=lambda _: [DecoratedString("", Color.black)],
+        floor_plan=floor_plan,
+        init_steps=[],
+        instructions=[
+            "You are at a new kitchen, and a agent will assist you",
+            "by providing suggestions",
+        ],
+    )
+    E = Interface(1440, 810, "log.json")
+    E.run_all([task])
     E.clean_up(close=True)
 
 
@@ -572,7 +590,7 @@ def experiment(trial: int):
         *tutorials,
         training,
         *post_train_surveys,
-        *sum([[task] + post_train_surveys for task in tasks], []),
+        *sum([[task] + post_task_surveys for task in tasks], []),
     ]
     E = Interface(
         1440, 810, "results/result_participant_{:02d}-{}.pkl".format(trial, time())
