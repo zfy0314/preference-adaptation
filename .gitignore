@@ -136,3 +136,4 @@ dmypy.json
 
 # Data logging
 log.json
+results/*.json

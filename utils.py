@@ -3,7 +3,7 @@ from collections import namedtuple
 from multiprocessing import Process, Queue
 from time import time
 from types import SimpleNamespace
-from typing import Tuple
+from typing import List, Tuple
 
 Color = SimpleNamespace(
     white=(255, 255, 255),
@@ -97,3 +97,18 @@ Task = namedtuple(
     ],
 )
 Survey = namedtuple("Survey", ["name", "question"])
+
+
+floorplans_init = json.load(open("floorplans.json", "r"))
+
+
+def get_init_steps(floor_plan: str) -> List[dict]:
+
+    try:
+        init_poses = floorplans_init[floor_plan]["object_poses"]
+    except KeyError:
+        init_steps = []
+    else:
+        init_steps = [dict(action="SetObjectPoses", objectPoses=init_poses)]
+
+    return init_steps

@@ -602,22 +602,14 @@ def dummy():
 
 def tour(floor_plan: str = "FloorPlan10"):
 
-    import json
-
-    init_poses = (
-        json.load(open("floorplans.json", "r"))
-        .get(floor_plan, {})
-        .get("object_poses", [])
-    )
+    from utils import get_init_steps
 
     task = Task(
         name="baseline",
         banner_func=lambda _: "",
         checklist_func=lambda _: [DecoratedString("", Color.black)],
         floor_plan=floor_plan,
-        init_steps=[]
-        if init_poses == []
-        else [dict(action="SetObjectPoses", objectPoses=init_poses)],
+        init_steps=get_init_steps(floor_plan),
         instructions=[
             "You are at a new kitchen, and a agent will assist you",
             "by providing suggestions",
@@ -633,9 +625,10 @@ def experiment(trial: int):
     from checklist import get_checklist
     from models import get_model
     from survey import post_task_surveys, post_train_surveys
+    from utils import get_init_steps
 
     all_floor_plans = ["FloorPlan" + str(x) for x in range(10, 15)]
-    all_strategies = ["coffee_first"] * 5  # TODO: change to actual
+    all_strategies = ["coffee_first", "sandwich_first", "greedy", "min_distance"]
     shuffle(all_floor_plans)
     shuffle(all_strategies)
     tasks = [
