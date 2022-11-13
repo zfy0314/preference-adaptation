@@ -1,8 +1,9 @@
 import pdb
 import queue as _queue
 from multiprocessing import Queue
-from pprint import pprint
+from pprint import pprint  # noqa
 from random import shuffle
+from time import time
 from typing import List, Optional, Union
 
 import ai2thor.controller as controller
@@ -166,8 +167,16 @@ class Interface:
             self.screen, Color.white, self.simulator_center, self.dot_size
         )
         text_x, text_y = self.simulator_center_right
+        pickupable = True
         if object_meta is not None:
-            text = self.mktext_tiny(object_meta["objectType"], True, Color.white)
+            object_name = object_meta["objectType"]
+            if self.coffee_timer is not None:
+                if object_meta["objectId"] in [self.coffee_machine, self.mug]:
+                    object_name += " (brewing... {:.1f}sec left)".format(
+                        15 - time() + self.coffee_timer
+                    )
+                    pickupable = False
+            text = self.mktext_tiny(object_name, True, Color.white)
             self.screen.blit(text, self.simulator_center_right)
             text_y += self.text_size_tiny
             if object_meta["openable"]:
@@ -179,7 +188,7 @@ class Interface:
                 self.screen.blit(text, (text_x, text_y))
                 text_y += self.text_size_tiny
             if self.object_in_hand is None:
-                if object_meta["pickupable"]:
+                if object_meta["pickupable"] and pickupable:
                     text = self.mktext_tiny(
                         "[click mouse] to pick up", True, Color.white
                     )
@@ -209,6 +218,18 @@ class Interface:
             if x["moveable"] or x["pickupable"]
         ]
         self.state = self.controller.step(action="SetObjectPoses", objectPoses=objects)
+
+    def init_coffee(self, coffee_machine: str):
+
+        mug_obj = [x for x in self.state.metadata["objects"] if "Mug" in x["name"]][0]
+        mug = mug_obj["objectId"]
+        if (
+            mug_obj["isFilledWithLiquid"]
+            and coffee_machine in mug_obj["parentReceptacles"]
+        ):
+            self.coffee_timer = time()
+            self.coffee_machine = coffee_machine
+            self.mug = mug
 
     def handle_mouse_click(self, objectId: str):
 
@@ -244,6 +265,8 @@ class Interface:
                         )
                     self.object_in_hand = None
                     self.has_knife = False
+                    if "CoffeeMachine" in objectId:
+                        self.init_coffee(objectId)
                 elif "Slice" in self.object_in_hand and "Slice" in objectId:
                     position_pointing = self.controller.step(
                         action="GetCoordinateFromRaycast",
@@ -259,7 +282,19 @@ class Interface:
                     )
                     self.object_in_hand = None
                     self.has_knife = False
-                pprint(state)
+
+        # coffee specific
+        if (
+            self.coffee_timer is not None
+            and self.object_in_hand == self.mug
+            and self.state.get_object(self.mug)["isFilledWithLiquid"]
+        ):
+            self.state = self.controller.step(
+                action="PutObject",
+                objectId=self.coffee_machine,
+                forceAction=True,
+            )
+            self.object_in_hand = None
 
     def run_task(self, task: Task):
 
@@ -304,6 +339,7 @@ class Interface:
         }
         self.object_in_hand = None
         self.has_knife = False
+        self.coffee_timer = None
 
         # load up models
         self.pipe_to_banner.put(self.state)
@@ -354,6 +390,12 @@ class Interface:
                             if action is not None:
                                 self.logger.log_action(task.name, action)
                                 self.state = self.controller.step(**action)
+                                if (
+                                    action["action"] == "ToggleObjectOn"
+                                    and "CoffeeMachine" in objectId
+                                    and self.coffee_timer is None
+                                ):
+                                    self.init_coffee(objectId)
 
                     elif event.type == pygame.MOUSEBUTTONDOWN and objectId is not None:
 
@@ -377,10 +419,24 @@ class Interface:
                     self.state = self.controller.step(action)
                 pygame.mouse.set_pos(self.simulator_center)
 
+                if self.coffee_timer is not None and time() - self.coffee_timer > 15:
+                    self.coffee_timer = None
+                    self.controller.step(
+                        action="ToggleObjectOff",
+                        objectId=self.coffee_machine,
+                        forceAction=True,
+                    )
+                    self.state = self.controller.step(
+                        action="FillObjectWithLiquid",
+                        objectId=self.mug,
+                        fillLiquid="coffee",
+                        forceAction=True,
+                    )
+
                 # update display
                 self.pipe_to_banner.put(self.state)
                 self.pipe_to_checklist.put(self.state)
-                if old_state != self.state:
+                if old_state != self.state or self.coffee_timer is not None:
                     self.update_simulator(self.state.get_object(objectId))
                 try:
                     banner = self.pipe_from_banner.get_nowait()
