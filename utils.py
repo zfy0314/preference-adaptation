@@ -1,7 +1,7 @@
 import json
 from collections import namedtuple
+from datetime import datetime
 from multiprocessing import Process, Queue
-from time import time
 from types import SimpleNamespace
 from typing import List, Tuple
 
@@ -23,12 +23,12 @@ class Logger:
 
     def log_action(self, task: str, action: dict):
         try:
-            self.actions[task].append((time(), action))
+            self.actions[task].append((str(datetime.now()), action))
         except KeyError:
-            self.actions[task] = [(time(), action)]
+            self.actions[task] = [(str(datetime.now()), action)]
 
     def log_survey(self, survey: str, res: int):
-        self.surveys[survey] = (time(), res)
+        self.surveys[survey] = (str(datetime.now()), res)
 
     def save(self):
         json.dump(
@@ -104,11 +104,19 @@ floorplans_init = json.load(open("floorplans.json", "r"))
 
 def get_init_steps(floor_plan: str) -> List[dict]:
 
+    config = floorplans_init.get(floor_plan, {})
     try:
-        init_poses = floorplans_init[floor_plan]["object_poses"]
+        init_poses = config["object_poses"]
     except KeyError:
         init_steps = []
     else:
         init_steps = [dict(action="SetObjectPoses", objectPoses=init_poses)]
+
+    try:
+        agent_pose = config["agent_pose"]
+    except KeyError:
+        pass
+    else:
+        init_steps.append(dict(action="Teleport", **agent_pose))
 
     return init_steps

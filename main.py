@@ -1,5 +1,6 @@
 import pdb
 import queue as _queue
+from copy import deepcopy
 from multiprocessing import Queue
 from pprint import pprint  # noqa
 from random import shuffle
@@ -124,7 +125,15 @@ class Interface:
 
         for task in tasks:
             if isinstance(task, Task):
-                self.run_task(task)
+                task1 = deepcopy(task)
+                original_name = task.name
+                res = self.run_task(task1)
+                cnt = 1
+                while not res:
+                    task1 = deepcopy(task)
+                    task1.name = original_name + "trial-{}".format(cnt)
+                    res = self.run_task(task1)
+                    cnt += 1
             elif isinstance(task, Survey):
                 self.show_survey(task)
             elif isinstance(task, list):
@@ -154,7 +163,7 @@ class Interface:
             self.screen.fill(Color.white, self.checklist_bbox)
             left, top = self.checklist_top_left
             for text in texts:
-                text = self.mktext_small(text.text, True, Color.black)
+                text = self.mktext_small(text.text, True, text.color)
                 top += self.text_size_small
                 self.screen.blit(text, (left, top))
             self.checklist_text = texts
@@ -296,7 +305,7 @@ class Interface:
             )
             self.object_in_hand = None
 
-    def run_task(self, task: Task):
+    def run_task(self, task: Task) -> bool:
 
         # initialization
         self.show_loading("Loading")
@@ -317,10 +326,9 @@ class Interface:
             fieldOfView=60,
         )
         self.state = self.controller.step(action="Teleport")
-        pprint(self.state.metadata["objects"])
         for action in task.init_steps:
             self.state = self.controller.step(**action)
-        pprint(self.state.metadata["objects"])
+            pprint(self.state)
         self.banner_text = ""
         self.checklist_text = []
 
@@ -351,8 +359,10 @@ class Interface:
         if task.instructions is not None:
             self.show_instructions(task.instructions)
         pygame.mouse.set_visible(False)
+        pygame.mouse.set_pos(self.simulator_center)
         self.update_banner(banner)
         self.update_checklist(checklist)
+        self.update_simulator(None)
         try:
             while banner is not None and checklist is not None:
 
@@ -386,6 +396,10 @@ class Interface:
                                         raise KeyboardInterrupt
                                     elif event.key == pygame.K_p:
                                         pdb.set_trace()
+                                    elif event.key == pygame.K_n:
+                                        self.logger.save()
+                                        self.clean_up(close=False)
+                                        return False
                         finally:
                             if action is not None:
                                 self.logger.log_action(task.name, action)
@@ -464,6 +478,7 @@ class Interface:
         # clean up
         self.logger.save()
         self.clean_up(close=False)
+        return True
 
     def show_survey(self, survey: Survey) -> int:
 
@@ -620,11 +635,21 @@ def tour(floor_plan: str = "FloorPlan10"):
     E.clean_up(close=True)
 
 
+def tutorial():
+
+    from tutorial import tutorials
+
+    E = Interface(1440, 810, "log.json")
+    E.run_all(tutorials)
+    E.clean_up(close=True)
+
+
 def experiment(trial: int):
 
     from checklist import get_checklist
     from models import get_model
     from survey import post_task_surveys, post_train_surveys
+    from tutorial import tutorials
     from utils import get_init_steps
 
     all_floor_plans = ["FloorPlan" + str(x) for x in range(10, 15)]
