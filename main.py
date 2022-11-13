@@ -182,7 +182,7 @@ class Interface:
             if self.coffee_timer is not None:
                 if object_meta["objectId"] in [self.coffee_machine, self.mug]:
                     object_name += " (brewing... {:.1f}sec left)".format(
-                        15 - time() + self.coffee_timer
+                        10 - time() + self.coffee_timer
                     )
                     pickupable = False
             text = self.mktext_tiny(object_name, True, Color.white)
@@ -433,7 +433,7 @@ class Interface:
                     self.state = self.controller.step(action)
                 pygame.mouse.set_pos(self.simulator_center)
 
-                if self.coffee_timer is not None and time() - self.coffee_timer > 15:
+                if self.coffee_timer is not None and time() - self.coffee_timer > 10:
                     self.coffee_timer = None
                     self.controller.step(
                         action="ToggleObjectOff",

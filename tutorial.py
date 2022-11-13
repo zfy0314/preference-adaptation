@@ -18,6 +18,42 @@ class StepBasedTutorial:
         self.total_steps = len(self.instructions)
         self.completed = False
 
+    def is_picked_up(self, state, object_type: str) -> bool:
+        return any(
+            x["parentReceptacles"] is None
+            for x in state.metadata["objects"]
+            if x["objectType"] == object_type
+        )
+
+    def is_put_down(self, state, object_type: str) -> bool:
+        return all(
+            x["parentReceptacles"] is not None
+            for x in state.metadata["objects"]
+            if x["objectType"] == object_type
+        )
+
+    def is_put_on(self, state, object_type: str, surface_type: str) -> bool:
+        return any(
+            x["parentReceptacles"] is not None
+            and any(surface_type in parent for parent in x["parentReceptacles"])
+            for x in state.metadata["objects"]
+            if x["objectType"] == object_type
+        )
+
+    def is_open(self, state, object_type: str) -> bool:
+        return any(
+            x["isOpen"]
+            for x in state.metadata["objects"]
+            if x["objectType"] == object_type
+        )
+
+    def is_close(self, state, object_type: str) -> bool:
+        return all(
+            not x["isOpen"]
+            for x in state.metadata["objects"]
+            if x["objectType"] == object_type
+        )
+
     def banner_func(self, state) -> str:
 
         if self.completed:
@@ -110,4 +146,175 @@ class NavigationTutorial(StepBasedTutorial):
         return abs(x0 - x1) + abs(z0 - z1) > 2
 
 
-tutorials = [NavigationTutorial().as_task()]
+class OpenObjectsTutorial(StepBasedTutorial):
+    landing_instruction = "Next, try opening / closing objects"
+    instructions = [
+        "Turn right and face the cabinate",
+        "Press [E] when the cursor is on the cabinate to open it",
+        "Press [E] again to close the cabinate",
+        "Turn around and walk to the fridge",
+        "Press [E] when the cursor is on the fridge to open it",
+        "Press [E] again to close the fridge",
+    ]
+    checklist = [
+        "locate cabinate",
+        "open cabinate",
+        "close cabinate",
+        "locate fridge",
+        "open freidge",
+        "close fridge",
+    ]
+    init_steps = get_init_steps("FloorPlan5_tutorial_navigation")
+
+    def get_location(self, state) -> Tuple[float, float]:
+
+        agent_position = state.metadata["agent"]["position"]
+        return (agent_position["x"], agent_position["z"])
+
+    def get_look(self, state) -> Tuple[float, float]:
+
+        agent = state.metadata["agent"]
+        return (agent["cameraHorizon"], agent["rotation"]["y"])
+
+    def step0(self, state):
+
+        ch, cy = self.get_look(state)
+        return -30 <= ch and ch <= -3 and 250 <= cy and ch <= 320
+
+    def step1(self, state):
+        return self.is_open(state, "Cabinet")
+
+    def step2(self, state):
+        return self.is_close(state, "Cabinet")
+
+    def step3(self, state):
+
+        ch, cy = self.get_look(state)
+        x, y = self.get_location(state)
+        return (
+            5 <= ch
+            and ch <= 30
+            and 75 <= cy
+            and cy <= 105
+            and 0.7 <= x
+            and x <= 1.4
+            and -0.8 <= y
+            and y <= -0.2
+        )
+
+    def step4(self, state):
+        return self.is_open(state, "Fridge")
+
+    def step5(self, state):
+        return self.is_close(state, "Fridge")
+
+
+class PickObjectsTutorial(StepBasedTutorial):
+
+    landing_instruction = "Then, try picking up and putting down objects"
+    instructions = [
+        "Locate the bread and click on it to pick it up",
+        "Click on the counter to put it down",
+        "Locate the Knife and click on it to pick it up",
+        "Click on the bread to slice it",
+        "Click on the counter to put down the knife",
+        "Click on a slice of bread to pick it up",
+        "Click on the plate to put the slice on the plate",
+        "Click on the plate to pick it up with the bread slice",
+    ]
+    checklist = [
+        "pick up bread",
+        "put down bread",
+        "pick up Knife",
+        "slice the break",
+        "put down Knife",
+        "pick up bread slice",
+        "put bread on plate",
+        "pick up plate",
+    ]
+    init_steps = get_init_steps("FloorPlan5_tutorial_objects")
+
+    def step0(self, state):
+        return self.is_picked_up(state, "Bread")
+
+    def step1(self, state):
+        return self.is_put_down(state, "Bread")
+
+    def step2(self, state):
+        return self.is_picked_up(state, "Knife")
+
+    def step3(self, state):
+        return any(x["objectType"] == "BreadSliced" for x in state.metadata["objects"])
+
+    def step4(self, state):
+        return self.is_put_down(state, "Knife")
+
+    def step5(self, state):
+        return self.is_picked_up(state, "BreadSliced")
+
+    def step6(self, state):
+        return self.is_put_on(state, "BreadSliced", "Plate")
+
+    def step7(self, state):
+        return self.is_picked_up(state, "Plate")
+
+
+class CoffeeTutorial(StepBasedTutorial):
+
+    landing_instruction = "Last, try making some coffee"
+    instructions = [
+        "Locate and click on the mug to pick it up",
+        "Click on the coffee machine to place to mug",
+        "Put the cursor on the coffee machine and press [F] to brew",
+        "Wait for the coffee to brew",
+        "Click on the mug to pick it up",
+        "Walk toward stool and place coffee on the counter nearby",
+    ]
+    checklist = [
+        "pick up mug",
+        "place mug in machine",
+        "start coffee machine",
+        "wait for coffee",
+        "pick up mug with coffee",
+        "put down coffee near stoll",
+    ]
+    init_steps = get_init_steps("FloorPlan5_tutorial_coffee")
+
+    def step0(self, state):
+        return self.is_picked_up(state, "Mug")
+
+    def step1(self, state):
+        return self.is_put_on(state, "Mug", "CoffeeMachine")
+
+    def step2(self, state):
+        return any(
+            x["isToggled"]
+            for x in state.metadata["objects"]
+            if x["objectType"] == "CoffeeMachine"
+        )
+
+    def step3(self, state):
+        return all(
+            not x["isToggled"]
+            for x in state.metadata["objects"]
+            if x["objectType"] == "CoffeeMachine"
+        )
+
+    def step4(self, state):
+        return self.is_picked_up(state, "Mug")
+
+    def step5(self, state):
+
+        mug_position = [
+            x["position"] for x in state.metadata["objects"] if x["objectType"] == "Mug"
+        ][0]
+        near_stool = mug_position["z"] > 0.5
+        return self.is_put_down(state, "Mug") and near_stool
+
+
+tutorials = [
+    NavigationTutorial().as_task(),
+    OpenObjectsTutorial().as_task(),
+    PickObjectsTutorial().as_task(),
+    CoffeeTutorial().as_task(),
+]
