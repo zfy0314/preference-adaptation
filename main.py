@@ -3,7 +3,6 @@ import queue as _queue
 from multiprocessing import Queue
 from pprint import pprint
 from random import shuffle
-from time import sleep, time
 from typing import List, Optional, Union
 
 import ai2thor.controller as controller
@@ -283,8 +282,10 @@ class Interface:
             fieldOfView=60,
         )
         self.state = self.controller.step(action="Teleport")
+        pprint(self.state.metadata["objects"])
         for action in task.init_steps:
             self.state = self.controller.step(**action)
+        pprint(self.state.metadata["objects"])
         self.banner_text = ""
         self.checklist_text = []
 
@@ -545,12 +546,22 @@ def dummy():
 
 def tour(floor_plan: str = "FloorPlan10"):
 
+    import json
+
+    init_poses = (
+        json.load(open("floorplans.json", "r"))
+        .get(floor_plan, {})
+        .get("object_poses", [])
+    )
+
     task = Task(
         name="baseline",
         banner_func=lambda _: "",
         checklist_func=lambda _: [DecoratedString("", Color.black)],
         floor_plan=floor_plan,
-        init_steps=[],
+        init_steps=[]
+        if init_poses == []
+        else [dict(action="SetObjectPoses", objectPoses=init_poses)],
         instructions=[
             "You are at a new kitchen, and a agent will assist you",
             "by providing suggestions",
