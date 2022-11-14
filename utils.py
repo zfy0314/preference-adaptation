@@ -122,6 +122,13 @@ def get_init_steps(floor_plan: str) -> List[dict]:
     else:
         init_steps.append(dict(action="Teleport", **agent_pose))
 
+    try:
+        extra_steps = config["extra_steps"]
+    except KeyError:
+        pass
+    else:
+        init_steps.extend(extra_steps)
+
     return init_steps
 
 
