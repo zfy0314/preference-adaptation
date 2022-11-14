@@ -8,6 +8,9 @@ post_task_surveys = [
     Survey(
         name="post_test_survey_2", question="I have paid attention to the suggestions."
     ),
+    Survey(
+        name="post_test_survey_5", question="I have followed the suggestions."
+    ),
     Survey(name="post_test_survey_3", question="The suggestions are helpful."),
     Survey(name="post_test_survey_4", question="The suggestions are reasonable."),
 ]

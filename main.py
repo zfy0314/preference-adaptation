@@ -254,29 +254,7 @@ class Interface:
                     action="SliceObject", objectId=objectId
                 )
             else:
-                state = self.controller.step(action="PutObject", objectId=objectId)
-                if state.metadata["lastActionSuccess"]:
-                    self.state = state
-                    if "Slice" in self.object_in_hand:
-                        current_object = self.state.get_object(self.object_in_hand)
-                        target_object = self.state.get_object(objectId)
-                        target_bbox = target_object["axisAlignedBoundingBox"]
-                        rotation = current_object["rotation"]
-                        position = current_object["position"]
-                        rotation["x"] = 90
-                        position["y"] = (
-                            max(pt[1] for pt in target_bbox["cornerPoints"])
-                            + target_bbox["size"]["y"] / 2
-                        )
-                        self.set_object_pose(
-                            {self.object_in_hand: position},
-                            {self.object_in_hand: rotation},
-                        )
-                    self.object_in_hand = None
-                    self.has_knife = False
-                    if "CoffeeMachine" in objectId:
-                        self.init_coffee(objectId)
-                elif "Slice" in self.object_in_hand and "Slice" in objectId:
+                if "Slice" in self.object_in_hand:
                     position_pointing = self.controller.step(
                         action="GetCoordinateFromRaycast",
                         x=0.50,
@@ -291,6 +269,46 @@ class Interface:
                     )
                     self.object_in_hand = None
                     self.has_knife = False
+                else:
+                    self.state = self.controller.step(action="PutObject", objectId=objectId)
+                    if self.state.metadata["lastActionSuccess"]:
+                    # self.state = state
+                    # if "Slice" in self.object_in_hand:
+                    #     current_object = self.state.get_object(self.object_in_hand)
+                    #     target_object = self.state.get_object(objectId)
+                    #     target_bbox = target_object["axisAlignedBoundingBox"]
+                    #     rotation = current_object["rotation"]
+                    #     position = current_object["position"]
+                    #     rotation["x"] = 90
+                    #     position["y"] = (
+                    #         max(pt[1] for pt in target_bbox["cornerPoints"])
+                    #         + target_bbox["size"]["y"] / 2
+                    #     )
+                    #     self.set_object_pose(
+                    #         {self.object_in_hand: position},
+                    #         {self.object_in_hand: rotation},
+                    #     )
+                        self.object_in_hand = None
+                        self.has_knife = False
+                        if "CoffeeMachine" in objectId:
+                            self.init_coffee(objectId)
+                # elif "Slice" in self.object_in_hand and "Slice" in objectId:
+                #     position_pointing = self.controller.step(
+                #         action="GetCoordinateFromRaycast",
+                #         x=0.50,
+                #         y=0.48,
+                #     ).metadata["actionReturn"]
+                #     self.set_object_pose(
+                #         {self.object_in_hand: position_pointing},
+                #         {self.object_in_hand: dict(x=90, y=0, z=0)},
+                #     )
+                #     self.state = self.controller.step(
+                #         action="DropHandObject", forceAction=True
+                #     )
+                #     self.object_in_hand = None
+                #     self.has_knife = False
+                # else:
+                #     pprint(state)
 
         # coffee specific
         if (
@@ -627,8 +645,8 @@ def tour(floor_plan: str = "FloorPlan10"):
         floor_plan=floor_plan,
         init_steps=get_init_steps(floor_plan),
         instructions=[
-            "You are at a new kitchen, and a agent will assist you",
-            "by providing suggestions",
+            "You are at a new kitchen, and an agent will assist you",
+            "by providing suggestions.",
         ],
     )
     E = Interface(1440, 810, "log.json")
@@ -662,6 +680,8 @@ def train(floor_plan: str = "FloorPlan5"):
                 "You have {} trials to go".format(3 - i),
                 "Only the last trials will be used for training agents",
                 "The rest are training trials for you",
+                "If you feel ready to move on, then you can skip the next trial",
+                "by pressing [ESC] in the simulator",
             ],
             floor_plan=floor_plan,
         )
@@ -734,7 +754,9 @@ def experiment(trial: int):
                 "It's time for you to demonstrate how you make breakfast",
                 "You have {} trials to go".format(3 - i),
                 "Only the last trials will be recorded",
-                "The rest are training trials for you",
+                "The rest are training trials for you to practice",
+                "If you feel ready to move on, then you can skip the next trial",
+                "by pressing [ESC] in the simulator",
             ],
         )
         for i in range(3)
