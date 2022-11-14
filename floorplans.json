@@ -1,5 +1,6 @@
 {
   "FloorPlan1": {
+    "chair_type": "stool",
     "object_poses": [
       {
         "objectName": "Glassbottle_a6112717",
@@ -438,6 +439,7 @@
     }
   },
   "FloorPlan5": {
+    "chair_type": "stool",
     "object_poses": [
       {
         "objectName": "HousePlant_873dd321",
@@ -1034,6 +1036,7 @@
     }
   },
   "FloorPlan6": {
+    "chair_type": "stool",
     "object_poses": [
       {
         "objectName": "Pan_eb61f4ff",
@@ -1394,6 +1397,7 @@
     }
   },
   "FloorPlan9": {
+    "chair_type": "chair",
     "object_poses": [
       {
         "objectName": "Plate_d6ba98ed",
@@ -1741,6 +1745,7 @@
     }
   },
   "FloorPlan14": {
+    "chair_type": "chair",
     "object_poses": [
       {
         "objectName": "Toaster_6b357ffc",
@@ -2075,6 +2080,7 @@
     }
   },
   "FloorPlan10": {
+    "chair_type": "chair",
     "object_poses": [
       {
         "objectName": "Glassbottle_3d895012",

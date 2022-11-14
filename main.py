@@ -671,6 +671,30 @@ def train(floor_plan: str = "FloorPlan5"):
     E.clean_up(close=True)
 
 
+def test(floor_plan: str = "FloorPlan5", model: str = "empty"):
+
+    from checklist import SandwichChecklist
+    from models import get_model
+    from utils import get_init_steps
+
+    tasks = [
+        Task(
+            name="test-{}-{}".format(floor_plan, model),
+            banner_func=get_model(floor_plan, model),
+            checklist_func=SandwichChecklist(),
+            init_steps=get_init_steps(floor_plan),
+            instructions=[
+                "You are in a new kitchen, making the same breakfast.",
+                "A new agent will give optional suggestions on the next step.",
+            ],
+            floor_plan=floor_plan,
+        )
+    ]
+    E = Interface(1440, 810, "log.json")
+    E.run_all(tasks)
+    E.clean_up(close=True)
+
+
 def experiment(trial: int):
 
     from checklist import SandwichChecklist

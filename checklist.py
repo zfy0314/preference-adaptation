@@ -84,6 +84,7 @@ class SandwichChecklist:
         self.tasks = SimpleNamespace(
             get_mug=False,
             get_bread=False,
+            get_lettuce=False,
             get_tomato=False,
             get_plate=False,
             get_knife=False,
@@ -107,28 +108,28 @@ class SandwichChecklist:
         return self.tasks.cut_bread or Checklist.is_near(
             Checklist.get_position(state, "Agent"),
             Checklist.get_position(state, "Bread"),
-            0.5,
         )
 
     def check_get_lettuce(self, state) -> bool:
-        return self.tasks.cut_lettus or Checklist.is_near(
+        return self.tasks.cut_lettuce or Checklist.is_near(
             Checklist.get_position(state, "Agent"),
             Checklist.get_position(state, "Lettuce"),
-            0.5,
         )
 
     def check_get_tomato(self, state) -> bool:
         return self.tasks.cut_tomato or Checklist.is_near(
             Checklist.get_position(state, "Agent"),
             Checklist.get_position(state, "Tomato"),
-            0.5,
         )
 
     def check_get_knife(self, state) -> bool:
         return Checklist.is_picked_up(state, "Knife")
 
     def check_get_plate(self, state) -> bool:
-        return Checklist.is_picked_up(state, "Plate")
+        return self.tasks.cut_tomato or Checklist.is_near(
+            Checklist.get_position(state, "Agent"),
+            Checklist.get_position(state, "Plate"),
+        )
 
     def check_cut_bread(self, state) -> bool:
         return Checklist.exists(state, "BreadSliced")
