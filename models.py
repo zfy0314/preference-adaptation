@@ -29,5 +29,7 @@ def get_model(floor_plan: str, strategy: str):
         return GreedyModel(floor_plan)
     elif strategy == "min_distance":
         return MinDistanceModel(floor_plan)
+    elif strategy == "empty":
+        return lambda x: ""
     else:
         return ActionModel(floor_plan, action_based[strategy])

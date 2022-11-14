@@ -1,6 +1,7 @@
 from time import sleep
 from typing import List, Optional, Tuple
 
+from checklist import Checklist
 from utils import Color, DecoratedString, Task, get_init_steps
 
 
@@ -17,42 +18,6 @@ class StepBasedTutorial:
         self.current_step = 0
         self.total_steps = len(self.instructions)
         self.completed = False
-
-    def is_picked_up(self, state, object_type: str) -> bool:
-        return any(
-            x["parentReceptacles"] is None
-            for x in state.metadata["objects"]
-            if x["objectType"] == object_type
-        )
-
-    def is_put_down(self, state, object_type: str) -> bool:
-        return all(
-            x["parentReceptacles"] is not None
-            for x in state.metadata["objects"]
-            if x["objectType"] == object_type
-        )
-
-    def is_put_on(self, state, object_type: str, surface_type: str) -> bool:
-        return any(
-            x["parentReceptacles"] is not None
-            and any(surface_type in parent for parent in x["parentReceptacles"])
-            for x in state.metadata["objects"]
-            if x["objectType"] == object_type
-        )
-
-    def is_open(self, state, object_type: str) -> bool:
-        return any(
-            x["isOpen"]
-            for x in state.metadata["objects"]
-            if x["objectType"] == object_type
-        )
-
-    def is_close(self, state, object_type: str) -> bool:
-        return all(
-            not x["isOpen"]
-            for x in state.metadata["objects"]
-            if x["objectType"] == object_type
-        )
 
     def banner_func(self, state) -> str:
 
@@ -182,10 +147,10 @@ class OpenObjectsTutorial(StepBasedTutorial):
         return -30 <= ch and ch <= -3 and 250 <= cy and ch <= 320
 
     def step1(self, state):
-        return self.is_open(state, "Cabinet")
+        return Checklist.is_open(state, "Cabinet")
 
     def step2(self, state):
-        return self.is_close(state, "Cabinet")
+        return Checklist.is_close(state, "Cabinet")
 
     def step3(self, state):
 
@@ -203,10 +168,10 @@ class OpenObjectsTutorial(StepBasedTutorial):
         )
 
     def step4(self, state):
-        return self.is_open(state, "Fridge")
+        return Checklist.is_open(state, "Fridge")
 
     def step5(self, state):
-        return self.is_close(state, "Fridge")
+        return Checklist.is_close(state, "Fridge")
 
 
 class PickObjectsTutorial(StepBasedTutorial):
@@ -235,28 +200,28 @@ class PickObjectsTutorial(StepBasedTutorial):
     init_steps = get_init_steps("FloorPlan5_tutorial_objects")
 
     def step0(self, state):
-        return self.is_picked_up(state, "Bread")
+        return Checklist.is_picked_up(state, "Bread")
 
     def step1(self, state):
-        return self.is_put_down(state, "Bread")
+        return Checklist.is_put_down(state, "Bread")
 
     def step2(self, state):
-        return self.is_picked_up(state, "Knife")
+        return Checklist.is_picked_up(state, "Knife")
 
     def step3(self, state):
-        return any(x["objectType"] == "BreadSliced" for x in state.metadata["objects"])
+        return Checklist.exists(state, "BreadSliced")
 
     def step4(self, state):
-        return self.is_put_down(state, "Knife")
+        return Checklist.is_put_down(state, "Knife")
 
     def step5(self, state):
-        return self.is_picked_up(state, "BreadSliced")
+        return Checklist.is_picked_up(state, "BreadSliced")
 
     def step6(self, state):
-        return self.is_put_on(state, "BreadSliced", "Plate")
+        return Checklist.is_put_on(state, "BreadSliced", "Plate")
 
     def step7(self, state):
-        return self.is_picked_up(state, "Plate")
+        return Checklist.is_picked_up(state, "Plate")
 
 
 class CoffeeTutorial(StepBasedTutorial):
@@ -281,10 +246,10 @@ class CoffeeTutorial(StepBasedTutorial):
     init_steps = get_init_steps("FloorPlan5_tutorial_coffee")
 
     def step0(self, state):
-        return self.is_picked_up(state, "Mug")
+        return Checklist.is_picked_up(state, "Mug")
 
     def step1(self, state):
-        return self.is_put_on(state, "Mug", "CoffeeMachine")
+        return Checklist.is_put_on(state, "Mug", "CoffeeMachine")
 
     def step2(self, state):
         return any(
@@ -301,7 +266,7 @@ class CoffeeTutorial(StepBasedTutorial):
         )
 
     def step4(self, state):
-        return self.is_picked_up(state, "Mug")
+        return Checklist.is_picked_up(state, "Mug")
 
     def step5(self, state):
 
@@ -309,7 +274,7 @@ class CoffeeTutorial(StepBasedTutorial):
             x["position"] for x in state.metadata["objects"] if x["objectType"] == "Mug"
         ][0]
         near_stool = mug_position["z"] > 0.5
-        return self.is_put_down(state, "Mug") and near_stool
+        return Checklist.is_put_down(state, "Mug") and near_stool
 
 
 tutorials = [

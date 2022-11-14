@@ -644,6 +644,33 @@ def tutorial():
     E.clean_up(close=True)
 
 
+def train(floor_plan: str = "FloorPlan5"):
+
+    from checklist import get_checklist
+    from models import get_model
+    from utils import get_init_steps
+
+    training = [
+        Task(
+            name="train-{}".format(i),
+            banner_func=get_model(floor_plan, "empty"),
+            checklist_func=get_checklist(floor_plan),
+            init_steps=get_init_steps(floor_plan),
+            instructions=[
+                "It's time for you to demonstrate how you make breakfast",
+                "You have {} trials to go".format(3 - i),
+                "Only the last trials will be used for training agents",
+                "The rest are training trials for you",
+            ],
+            floor_plan=floor_plan,
+        )
+        for i in range(3)
+    ]
+    E = Interface(1440, 810, "log.json")
+    E.run_all(training)
+    E.clean_up(close=True)
+
+
 def experiment(trial: int):
 
     from checklist import get_checklist
@@ -669,6 +696,22 @@ def experiment(trial: int):
             ],
         )
         for floor_plan, strategy in zip(all_floor_plans, all_strategies)
+    ]
+    training_floor_plan = "FloorPlan5"
+    training = [
+        Task(
+            name="train-{}".format(i),
+            banner_func=get_model("empty"),
+            checklist_func=get_checklist(training_floor_plan),
+            init_steps=get_init_steps(training_floor_plan),
+            instructions=[
+                "It's time for you to demonstrate how you make breakfast",
+                "You have {} trials to go".format(3 - i),
+                "Only the last trials will be used for training agents",
+                "The rest are training trials for you",
+            ],
+        )
+        for i in range(3)
     ]
 
     procedures = [

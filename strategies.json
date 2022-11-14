@@ -1,55 +1,54 @@
 {
-    "coffee_first": [
-      "Get Mug",
-      "Walk to Coffee Machine",
-      "Turn on Coffee Machine",
-      "Wait for Coffee to Brew",
-      "Bring Coffee to Chair",
-      "Get Plate",
-      [
-        "Get Bread",
-        "Get Lettuce",
-        "Get Tomato"
-      ],
-      "Get Knife",
-      [
-        "Cut Bread",
-        "Cut Lettuce",
-        "Cut Tomato"
-      ],
-      "Place Slice of Bread",
-      [
-        "Place Lettuce on Bread",
-        "Place Tomato on Bread"
-      ],
-      "Place Slice of Bread",
-      "Bring Sandwich to Chair"
+  "coffee_first": [
+    "Get Mug",
+    "Walk to Coffee Machine",
+    "Turn on Coffee Machine",
+    "Wait for Coffee to Brew",
+    "Bring Coffee to Chair",
+    "Get Plate",
+    [
+      "Get Bread",
+      "Get Lettuce",
+      "Get Tomato"
     ],
-    "sandwich_first": [
-      "Get Plate",
-      [
-        "Get Bread",
-        "Get Lettuce",
-        "Get Tomato"
-      ],
-      "Get Knife",
-      [
-        "Cut Bread",
-        "Cut Lettuce",
-        "Cut Tomato"
-      ],
-      "Place Slice of Bread",
-      [
-        "Place Lettuce on Bread",
-        "Place Tomato on Bread"
-      ],
-      "Place Slice of Bread",
-      "Bring Sandwich to Chair",
-      "Get Mug",
-      "Walk to Coffee Machine",
-      "Turn on Coffee Machine",
-      "Wait for Coffee to Brew",
-      "Bring Coffee to Chair"
-    ]
-  }
-  
+    "Get Knife",
+    [
+      "Cut Bread",
+      "Cut Lettuce",
+      "Cut Tomato"
+    ],
+    "Place Slice of Bread",
+    [
+      "Place Lettuce on Bread",
+      "Place Tomato on Bread"
+    ],
+    "Place Slice of Bread",
+    "Bring Sandwich to Chair"
+  ],
+  "sandwich_first": [
+    "Get Plate",
+    [
+      "Get Bread",
+      "Get Lettuce",
+      "Get Tomato"
+    ],
+    "Get Knife",
+    [
+      "Cut Bread",
+      "Cut Lettuce",
+      "Cut Tomato"
+    ],
+    "Place Slice of Bread",
+    [
+      "Place Lettuce on Bread",
+      "Place Tomato on Bread"
+    ],
+    "Place Slice of Bread",
+    "Bring Sandwich to Chair",
+    "Get Mug",
+    "Walk to Coffee Machine",
+    "Turn on Coffee Machine",
+    "Wait for Coffee to Brew",
+    "Bring Coffee to Chair"
+  ]
+}
