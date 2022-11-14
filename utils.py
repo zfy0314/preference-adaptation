@@ -99,12 +99,12 @@ Task = namedtuple(
 Survey = namedtuple("Survey", ["name", "question"])
 
 
-floorplans_init = json.load(open("floorplans.json", "r"))
+floorplans_config = json.load(open("floorplans.json", "r"))
 
 
 def get_init_steps(floor_plan: str) -> List[dict]:
 
-    config = floorplans_init.get(floor_plan, {})
+    config = floorplans_config.get(floor_plan, {})
     try:
         init_poses = config["object_poses"]
     except KeyError:

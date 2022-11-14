@@ -1,6 +1,6 @@
-import json
+from time import sleep
 from types import SimpleNamespace
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from utils import Color, DecoratedString
 
@@ -52,14 +52,25 @@ class Checklist:
         return any(x["objectType"] == object_type for x in state.metadata["objects"])
 
     @staticmethod
-    def is_near(position1: dict, position2: dict) -> bool:
+    def is_near(position1: dict, position2: dict, threshold: float = 0.58) -> bool:
         return (
             max(
                 abs(position1["x"] - position2["x"]),
                 abs(position1["z"] - position2["z"]),
             )
-            < 0.58
+            < threshold
         )
+
+    @staticmethod
+    def get_position(state, object_type: str) -> Dict[str, float]:
+        if object_type == "Agent":
+            return state.metadata["agent"]["position"]
+        else:
+            return [
+                x["position"]
+                for x in state.metadata["objects"]
+                if x["objectType"] == object_type
+            ][0]
 
 
 class SandwichChecklist:
@@ -67,6 +78,8 @@ class SandwichChecklist:
     chair_location: Tuple[float, float]
 
     def __init__(self):
+
+        self.initialized = False
         self.completed = False
         self.tasks = SimpleNamespace(
             get_mug=False,
@@ -91,13 +104,25 @@ class SandwichChecklist:
         return Checklist.is_picked_up(state, "Mug")
 
     def check_get_bread(self, state) -> bool:
-        return Checklist.is_picked_up(state, "Bread") or self.tasks.cut_bread
+        return self.tasks.cut_bread or Checklist.is_near(
+            Checklist.get_position(state, "Agent"),
+            Checklist.get_position(state, "Bread"),
+            0.5,
+        )
 
     def check_get_lettuce(self, state) -> bool:
-        return Checklist.is_picked_up(state, "Lettuce") or self.tasks.cut_lettuce
+        return self.tasks.cut_lettus or Checklist.is_near(
+            Checklist.get_position(state, "Agent"),
+            Checklist.get_position(state, "Lettuce"),
+            0.5,
+        )
 
     def check_get_tomato(self, state) -> bool:
-        return Checklist.is_picked_up(state, "Tomato") or self.tasks.cut_tomato
+        return self.tasks.cut_tomato or Checklist.is_near(
+            Checklist.get_position(state, "Agent"),
+            Checklist.get_position(state, "Tomato"),
+            0.5,
+        )
 
     def check_get_knife(self, state) -> bool:
         return Checklist.is_picked_up(state, "Knife")
@@ -146,33 +171,36 @@ class SandwichChecklist:
         )
 
     def check_bring_coffee(self, state) -> bool:
-
-        mug_position = [
-            x["position"] for x in state.metadata["objects"] if x["objectType"] == "Mug"
-        ][0]
         return (
             self.tasks.get_coffee
-            and Checklist.is_near(self.chair_location, mug_position)
+            and Checklist.is_near(
+                self.chair_location, Checklist.get_position(state, "Mug")
+            )
             and Checklist.is_put_down(state, "Mug")
         )
 
     def check_bring_plate(self, state) -> bool:
-
-        plate_position = [
-            x["position"]
-            for x in state.metadata["objects"]
-            if x["objectType"] == "Plate"
-        ][0]
         return (
             self.tasks.get_coffee
-            and Checklist.is_near(self.chair_location, plate_position)
+            and Checklist.is_near(
+                self.chair_location, Checklist.get_position(state, "Plate")
+            )
             and Checklist.is_put_down(state, "Plate")
         )
 
     def __call__(self, state) -> List[DecoratedString]:
 
         if self.completed:
+            sleep(1.5)
             return None
+
+        if not self.initialized:
+            self.initialized = True
+            try:
+                self.chair_location = Checklist.get_position(state, "Chair")
+            except IndexError:
+                self.chair_location = Checklist.get_position(state, "Stool")
+            assert hasattr(self, "chair_location")
 
         for task, checked in self.tasks.__dict__.items():
             if not checked:
@@ -189,11 +217,3 @@ class SandwichChecklist:
                 DecoratedString("{} steps completed".format(completed), Color.green),
                 DecoratedString("{} steps incomplete".format(incomplete), Color.red),
             ]
-
-
-def get_checklist(floor_plan: str) -> SandwichChecklist:
-
-    config = json.load(open("floorplans.json", "r"))
-    checklist_obj = SandwichChecklist()
-    checklist_obj.chair_location = config[floor_plan]["chair_location"]
-    return checklist_obj

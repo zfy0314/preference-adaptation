@@ -240,8 +240,8 @@ class CoffeeTutorial(StepBasedTutorial):
         "place mug in machine",
         "start coffee machine",
         "wait for coffee",
-        "pick up mug with coffee",
-        "put down coffee near stoll",
+        "pick up coffee mug",
+        "put coffee near stool",
     ]
     init_steps = get_init_steps("FloorPlan5_tutorial_coffee")
 

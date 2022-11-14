@@ -646,7 +646,7 @@ def tutorial():
 
 def train(floor_plan: str = "FloorPlan5"):
 
-    from checklist import get_checklist
+    from checklist import SandwichChecklist
     from models import get_model
     from utils import get_init_steps
 
@@ -654,7 +654,7 @@ def train(floor_plan: str = "FloorPlan5"):
         Task(
             name="train-{}".format(i),
             banner_func=get_model(floor_plan, "empty"),
-            checklist_func=get_checklist(floor_plan),
+            checklist_func=SandwichChecklist(),
             init_steps=get_init_steps(floor_plan),
             instructions=[
                 "It's time for you to demonstrate how you make breakfast",
@@ -673,7 +673,7 @@ def train(floor_plan: str = "FloorPlan5"):
 
 def experiment(trial: int):
 
-    from checklist import get_checklist
+    from checklist import SandwichChecklist
     from models import get_model
     from survey import post_task_surveys, post_train_surveys
     from tutorial import tutorials
@@ -687,7 +687,7 @@ def experiment(trial: int):
         Task(
             name=floor_plan + " " + strategy,
             banner_func=get_model(floor_plan, strategy),
-            checklist_func=get_checklist(floor_plan),
+            checklist_func=SandwichChecklist(),
             floor_plan=floor_plan,
             init_steps=get_init_steps(floor_plan),
             instructions=[
@@ -702,12 +702,12 @@ def experiment(trial: int):
         Task(
             name="train-{}".format(i),
             banner_func=get_model("empty"),
-            checklist_func=get_checklist(training_floor_plan),
+            checklist_func=SandwichChecklist(),
             init_steps=get_init_steps(training_floor_plan),
             instructions=[
                 "It's time for you to demonstrate how you make breakfast",
                 "You have {} trials to go".format(3 - i),
-                "Only the last trials will be used for training agents",
+                "Only the last trials will be recorded",
                 "The rest are training trials for you",
             ],
         )

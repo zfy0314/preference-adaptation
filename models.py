@@ -1,35 +1,41 @@
-import json
-
-action_based = json.load(open("strategies.json"))
+from checklist import SandwichChecklist
+from utils import floorplans_config
 
 
 class ModelBase:
+    def __init__(self, floor_plan: str):
+        self.checklist = SandwichChecklist()
+        self.floor_plan_config = floorplans_config.get(floor_plan, {})
+
+
+class SandwichFirstModel(ModelBase):
     def __call__(self, state: dict) -> str:
         raise NotImplementedError
 
 
-class ActionModel(ModelBase):
-    def __init__(self, floor_plan: str, actions: list):
-        pass
+class CoffeeFirstModel(ModelBase):
+    def __call__(self, state: dict) -> str:
+        raise NotImplementedError
 
 
 class GreedyModel(ModelBase):
-    def __init__(self, floor_plan: str):
-        pass
+    def __call__(self, state: dict) -> str:
+        raise NotImplementedError
 
 
 class MinDistanceModel(ModelBase):
-    def __init__(self, floor_plan: str):
-        pass
+    def __call__(self, state: dict) -> str:
+        raise NotImplementedError
+
+
+models = {
+    "greedy": GreedyModel,
+    "min_distance": MinDistanceModel,
+    "empty": lambda floor_plan: lambda state: "",
+    "coffee_first": CoffeeFirstModel,
+    "sandwich_first": SandwichFirstModel,
+}
 
 
 def get_model(floor_plan: str, strategy: str):
-
-    if strategy == "greedy":
-        return GreedyModel(floor_plan)
-    elif strategy == "min_distance":
-        return MinDistanceModel(floor_plan)
-    elif strategy == "empty":
-        return lambda x: ""
-    else:
-        return ActionModel(floor_plan, action_based[strategy])
+    return models[strategy](floor_plan)
