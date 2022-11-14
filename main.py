@@ -406,6 +406,7 @@ class Interface:
                                     elif event.key == pygame.K_n:
                                         self.logger.save()
                                         self.clean_up(close=False)
+                                        self.controller.step(action="Done")
                                         return False
                         finally:
                             if action is not None:
@@ -485,6 +486,7 @@ class Interface:
         # clean up
         self.logger.save()
         self.clean_up(close=False)
+        self.controller.step(action="Done")
         return True
 
     def show_survey(self, survey: Survey) -> int:

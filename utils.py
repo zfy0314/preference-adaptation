@@ -37,6 +37,7 @@ class Logger:
         json.dump(
             dict(actions=self.actions, surveys=self.surveys),
             open(self.log_file, "w"),
+            indent=2
         )
 
 
