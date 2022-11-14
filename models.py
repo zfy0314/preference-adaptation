@@ -219,16 +219,16 @@ class InterleaveModel(ActionSequenceModel):
     @property
     def checkpoints(self) -> list[callable]:
         return (
-            self.sandwich_checkpoints
-            + self.coffee_start_checkpoints
+            self.coffee_start_checkpoints
+            + self.sandwich_checkpoints
             + self.coffee_finish_checkpoints
         )
 
     @property
     def instructions(self) -> list[callable]:
         return (
-            self.sandwich_instructions
-            + self.coffee_start_instructions
+            self.coffee_start_instructions
+            + self.sandwich_instructions
             + self.coffee_finish_instructions
         )
 
