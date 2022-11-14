@@ -701,10 +701,10 @@ def experiment(trial: int):
     from models import get_model
     from survey import post_task_surveys, post_train_surveys
     from tutorial import tutorials
-    from utils import get_init_steps
+    from utils import get_init_steps, welcome
 
-    all_floor_plans = ["FloorPlan" + str(x) for x in range(10, 15)]
-    all_strategies = ["coffee_first", "sandwich_first", "greedy", "min_distance"]
+    all_floor_plans = ["FloorPlan9", "FloorPlan10", "FloorPlan6"]
+    all_strategies = ["coffee_first", "sandwich_first", "interleave"]
     shuffle(all_floor_plans)
     shuffle(all_strategies)
     tasks = [
@@ -715,8 +715,8 @@ def experiment(trial: int):
             floor_plan=floor_plan,
             init_steps=get_init_steps(floor_plan),
             instructions=[
-                "You are now in a new kitchen, and you are making the same breakfast.",
-                "A new agent will provide optional suggestions on what to do next.",
+                "You are in a new kitchen, making the same breakfast.",
+                "A new agent will give optional suggestions on the next step.",
             ],
         )
         for floor_plan, strategy in zip(all_floor_plans, all_strategies)
@@ -725,8 +725,9 @@ def experiment(trial: int):
     training = [
         Task(
             name="train-{}".format(i),
-            banner_func=get_model("empty"),
+            banner_func=get_model(training_floor_plan, "empty"),
             checklist_func=SandwichChecklist(),
+            floor_plan=training_floor_plan,
             init_steps=get_init_steps(training_floor_plan),
             instructions=[
                 "It's time for you to demonstrate how you make breakfast",
@@ -739,13 +740,14 @@ def experiment(trial: int):
     ]
 
     procedures = [
+        welcome,
         *tutorials,
-        training,
+        *training,
         *post_train_surveys,
         *sum([[task] + post_task_surveys for task in tasks], []),
     ]
     E = Interface(
-        1440, 810, "results/result_participant_{:02d}-{}.pkl".format(trial, time())
+        1440, 810, "results/result_participant_{:02d}-{}.json".format(trial, time())
     )
     E.run_all(procedures)
     E.clean_up(close=True)

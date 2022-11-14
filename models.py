@@ -36,7 +36,7 @@ class ActionSequenceModel:
             return self.instructions[self.current_step]()
 
     @property
-    def coffee_checkpoints(self) -> list[callable]:
+    def coffee_start_checkpoints(self) -> list[callable]:
         return [
             lambda state: self.checklist.tasks.get_mug,
             lambda state: Checklist.is_near(
@@ -45,6 +45,11 @@ class ActionSequenceModel:
                 0.85,
             ),
             lambda state: self.checklist.tasks.turn_on_coffee_machine,
+        ]
+
+    @property
+    def coffee_finish_checkpoints(self) -> list[callable]:
+        return [
             lambda state: any(
                 not x["isToggled"]
                 for x in state.metadata["objects"]
@@ -55,11 +60,16 @@ class ActionSequenceModel:
         ]
 
     @property
-    def coffee_instructions(self) -> list[callable]:
+    def coffee_start_instructions(self) -> list[callable]:
         return [
             lambda: "Get mug {}".format(self.get_config("mug_location", "")),
             lambda: "Walk to coffee machine",
             lambda: "Put mug in coffee machine and start brewing",
+        ]
+
+    @property
+    def coffee_finish_instructions(self) -> list[callable]:
+        return [
             lambda: "Wait for the coffee to brew",
             lambda: "Pick up the mug with coffee",
             lambda: "Bring coffee to the table near {}".format(
@@ -172,27 +182,65 @@ class ActionSequenceModel:
 class CoffeeFirstModel(ActionSequenceModel):
     @property
     def checkpoints(self) -> list[callable]:
-        return self.coffee_checkpoints + self.sandwich_checkpoints
+        return (
+            self.coffee_start_checkpoints
+            + self.coffee_finish_checkpoints
+            + self.sandwich_checkpoints
+        )
 
     @property
     def instructions(self) -> list[callable]:
-        return self.coffee_instructions + self.sandwich_instructions
+        return (
+            self.coffee_start_instructions
+            + self.coffee_finish_instructions
+            + self.sandwich_instructions
+        )
 
 
 class SandwichFirstModel(ActionSequenceModel):
     @property
     def checkpoints(self) -> list[callable]:
-        return self.sandwich_checkpoints + self.coffee_checkpoints
+        return (
+            self.sandwich_checkpoints
+            + self.coffee_start_checkpoints
+            + self.coffee_finish_checkpoints
+        )
 
     @property
     def instructions(self) -> list[callable]:
-        return self.sandwich_instructions + self.coffee_instructions
+        return (
+            self.sandwich_instructions
+            + self.coffee_start_instructions
+            + self.coffee_finish_instructions
+        )
+
+
+class InterleaveModel(ActionSequenceModel):
+    @property
+    def checkpoints(self) -> list[callable]:
+        return (
+            self.sandwich_checkpoints
+            + self.coffee_start_checkpoints
+            + self.coffee_finish_checkpoints
+        )
+
+    @property
+    def instructions(self) -> list[callable]:
+        return (
+            self.sandwich_instructions
+            + self.coffee_start_instructions
+            + self.coffee_finish_instructions
+        )
 
 
 class GreedyModel:
     def __init__(self, floor_plan: str):
         self.checklist = SandwichChecklist()
         self.floor_plan_config = floorplans_config.get(floor_plan, {})
+        self.checkpoints = {"get_mug": None}
+        self.instructions = {}
+        self.distance = {}
+        self.dependency = {}
 
     def __call__(self, state: dict) -> str:
         raise NotImplementedError
@@ -213,6 +261,7 @@ models = {
     "empty": lambda floor_plan: lambda state: "",
     "coffee_first": CoffeeFirstModel,
     "sandwich_first": SandwichFirstModel,
+    "interleave": InterleaveModel,
 }
 
 

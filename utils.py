@@ -28,7 +28,10 @@ class Logger:
             self.actions[task] = [(str(datetime.now()), action)]
 
     def log_survey(self, survey: str, res: int):
-        self.surveys[survey] = (str(datetime.now()), res)
+        try:
+            self.surveys[survey].append((str(datetime.now()), res))
+        except KeyError:
+            self.surveys[survey] = [(str(datetime.now()), res)]
 
     def save(self):
         json.dump(
@@ -120,3 +123,9 @@ def get_init_steps(floor_plan: str) -> List[dict]:
         init_steps.append(dict(action="Teleport", **agent_pose))
 
     return init_steps
+
+
+welcome = [
+    "Welcome to the simulated kitchen environment!",
+    "Here's a tutorial on how to use it",
+]

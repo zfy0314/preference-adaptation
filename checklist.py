@@ -182,7 +182,7 @@ class SandwichChecklist:
 
     def check_bring_plate(self, state) -> bool:
         return (
-            self.tasks.get_coffee
+            self.tasks.place_second_bread
             and Checklist.is_near(
                 self.chair_location, Checklist.get_position(state, "Plate")
             )
