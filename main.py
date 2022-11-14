@@ -542,6 +542,7 @@ class Interface:
             pass
         finally:
             self.logger.log_survey(survey.name, res)
+            self.logger.save()
 
     def show_instructions(self, instructions: List[str]):
 

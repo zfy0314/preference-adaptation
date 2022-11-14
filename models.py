@@ -149,7 +149,7 @@ class ActionSequenceModel:
                 if self.checklist.tasks.get_lettuce
                 else "Get lettuce / tomato"
             ),
-            lambda: ("Get lettuce" if self.checklist.tasks.get_tomato else "Get_tomato")
+            lambda: ("Get lettuce" if self.checklist.tasks.get_tomato else "Get tomato")
             if self.checklist.tasks.get_bread
             else "Get bread",
             lambda: "Get knife {}".format(self.get_config("knife_location", "")),

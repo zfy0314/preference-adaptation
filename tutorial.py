@@ -102,31 +102,31 @@ class NavigationTutorial(StepBasedTutorial):
 
         x0, y0 = self.get_look(self.start_state)
         x1, y1 = self.get_look(state)
-        return abs(x0 - x1) + abs(y0 - y1) > 180
+        return abs(x0 - x1) + abs(y0 - y1) > 90
 
     def step1(self, state):
 
         x0, z0 = self.get_location(self.start_state)
         x1, z1 = self.get_location(state)
-        return abs(x0 - x1) + abs(z0 - z1) > 2
+        return abs(x0 - x1) + abs(z0 - z1) > 1.2
 
 
 class OpenObjectsTutorial(StepBasedTutorial):
     landing_instruction = "Next, try opening / closing objects"
     instructions = [
-        "Turn right and face the cabinate",
-        "Press [E] when the cursor is on the cabinate to open it",
-        "Press [E] again to close the cabinate",
+        "Turn right and face the cabinet",
+        "Press [E] when the cursor is on the cabinet to open it",
+        "Press [E] again to close the cabinet",
         "Turn around and walk to the fridge",
         "Press [E] when the cursor is on the fridge to open it",
         "Press [E] again to close the fridge",
     ]
     checklist = [
-        "locate cabinate",
-        "open cabinate",
-        "close cabinate",
-        "locate fridge",
-        "open freidge",
+        "locate cabinet",
+        "open cabinet",
+        "close cabinet",
+        "walk to fridge",
+        "open fridge",
         "close fridge",
     ]
     init_steps = get_init_steps("FloorPlan5_tutorial_navigation")
@@ -161,7 +161,7 @@ class OpenObjectsTutorial(StepBasedTutorial):
             and ch <= 30
             and 75 <= cy
             and cy <= 105
-            and 0.7 <= x
+            and 0.5 <= x
             and x <= 1.4
             and -0.8 <= y
             and y <= -0.2
@@ -191,7 +191,7 @@ class PickObjectsTutorial(StepBasedTutorial):
         "pick up bread",
         "put down bread",
         "pick up Knife",
-        "slice the break",
+        "slice the bread",
         "put down Knife",
         "pick up bread slice",
         "put bread on plate",
