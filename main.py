@@ -226,7 +226,9 @@ class Interface:
             for x in self.state.metadata["objects"]
             if x["moveable"] or x["pickupable"]
         ]
-        self.state = self.controller.step(action="SetObjectPoses", objectPoses=objects)
+        action = dict(action="SetObjectPoses", objectPoses=objects)
+        self.state = self.controller.step(**action)
+        self.logger.log_action(self.current_task, action)
 
     def init_coffee(self, coffee_machine: str):
 
@@ -242,19 +244,43 @@ class Interface:
 
     def handle_mouse_click(self, objectId: str):
 
+        action = None
         if self.object_in_hand is None:
-            state = self.controller.step(action="PickupObject", objectId=objectId)
+            action = dict(action="PickupObject", objectId=objectId)
+            state = self.controller.step(**action)
             if state.metadata["lastActionSuccess"]:
                 self.state = state
                 self.object_in_hand = objectId
                 self.has_knife = "Knife" in objectId
         else:
             if self.has_knife and self.state.get_object(objectId)["sliceable"]:
-                self.state = self.controller.step(
-                    action="SliceObject", objectId=objectId
-                )
+                action = dict(action="SliceObject", objectId=objectId)
+                self.state = self.controller.step(**action)
             else:
-                if "Slice" in self.object_in_hand:
+                action = dict(action="PutObject", objectId=objectId)
+                state = self.controller.step(**action)
+                if state.metadata["lastActionSuccess"]:
+                    self.state = state
+                    if "Slice" in self.object_in_hand:
+                        current_object = self.state.get_object(self.object_in_hand)
+                        target_object = self.state.get_object(objectId)
+                        target_bbox = target_object["axisAlignedBoundingBox"]
+                        rotation = current_object["rotation"]
+                        position = current_object["position"]
+                        rotation["x"] = 90
+                        position["y"] = (
+                            max(pt[1] for pt in target_bbox["cornerPoints"])
+                            + target_bbox["size"]["y"] / 2
+                        )
+                        self.set_object_pose(
+                            {self.object_in_hand: position},
+                            {self.object_in_hand: rotation},
+                        )
+                    self.object_in_hand = None
+                    self.has_knife = False
+                    if "CoffeeMachine" in objectId:
+                        self.init_coffee(objectId)
+                elif "Slice" in self.object_in_hand:
                     position_pointing = self.controller.step(
                         action="GetCoordinateFromRaycast",
                         x=0.50,
@@ -264,51 +290,13 @@ class Interface:
                         {self.object_in_hand: position_pointing},
                         {self.object_in_hand: dict(x=90, y=0, z=0)},
                     )
-                    self.state = self.controller.step(
-                        action="DropHandObject", forceAction=True
-                    )
+                    action = dict(action="DropHandObject", forceAction=True)
+                    self.state = self.controller.step(**action)
                     self.object_in_hand = None
                     self.has_knife = False
-                else:
-                    self.state = self.controller.step(action="PutObject", objectId=objectId)
-                    if self.state.metadata["lastActionSuccess"]:
-                    # self.state = state
-                    # if "Slice" in self.object_in_hand:
-                    #     current_object = self.state.get_object(self.object_in_hand)
-                    #     target_object = self.state.get_object(objectId)
-                    #     target_bbox = target_object["axisAlignedBoundingBox"]
-                    #     rotation = current_object["rotation"]
-                    #     position = current_object["position"]
-                    #     rotation["x"] = 90
-                    #     position["y"] = (
-                    #         max(pt[1] for pt in target_bbox["cornerPoints"])
-                    #         + target_bbox["size"]["y"] / 2
-                    #     )
-                    #     self.set_object_pose(
-                    #         {self.object_in_hand: position},
-                    #         {self.object_in_hand: rotation},
-                    #     )
-                        self.object_in_hand = None
-                        self.has_knife = False
-                        if "CoffeeMachine" in objectId:
-                            self.init_coffee(objectId)
-                # elif "Slice" in self.object_in_hand and "Slice" in objectId:
-                #     position_pointing = self.controller.step(
-                #         action="GetCoordinateFromRaycast",
-                #         x=0.50,
-                #         y=0.48,
-                #     ).metadata["actionReturn"]
-                #     self.set_object_pose(
-                #         {self.object_in_hand: position_pointing},
-                #         {self.object_in_hand: dict(x=90, y=0, z=0)},
-                #     )
-                #     self.state = self.controller.step(
-                #         action="DropHandObject", forceAction=True
-                #     )
-                #     self.object_in_hand = None
-                #     self.has_knife = False
-                # else:
-                #     pprint(state)
+                    
+        if action is not None:
+            self.logger.log_action(self.current_task, action)
 
         # coffee specific
         if (
@@ -349,6 +337,7 @@ class Interface:
             pprint(self.state)
         self.banner_text = ""
         self.checklist_text = []
+        self.current_task = task.name
 
         # simulator specific
         toggleables = {

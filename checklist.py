@@ -175,7 +175,7 @@ class SandwichChecklist:
         return (
             self.tasks.get_coffee
             and Checklist.is_near(
-                self.chair_location, Checklist.get_position(state, "Mug", 0.65)
+                self.chair_location, Checklist.get_position(state, "Mug"), 0.65
             )
             and Checklist.is_put_down(state, "Mug")
         )
@@ -184,7 +184,7 @@ class SandwichChecklist:
         return (
             self.tasks.place_second_bread
             and Checklist.is_near(
-                self.chair_location, Checklist.get_position(state, "Plate", 0.65)
+                self.chair_location, Checklist.get_position(state, "Plate"), 0.65
             )
             and Checklist.is_put_down(state, "Plate")
         )
