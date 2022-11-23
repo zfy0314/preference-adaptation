@@ -294,7 +294,7 @@ class Interface:
                     self.state = self.controller.step(**action)
                     self.object_in_hand = None
                     self.has_knife = False
-                    
+
         if action is not None:
             self.logger.log_action(self.current_task, action)
 
