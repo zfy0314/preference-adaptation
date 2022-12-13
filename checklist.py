@@ -6,6 +6,8 @@ from utils import Color, DecoratedString
 
 
 class Checklist:
+    checked_sequence: List[str] = []
+
     @staticmethod
     def is_picked_up(state, object_type: str) -> bool:
         return any(
@@ -100,6 +102,7 @@ class SandwichChecklist:
             bring_coffee=False,
             bring_plate=False,
         )
+        self.checked_sequence = []
 
     def check_get_mug(self, state) -> bool:
         return Checklist.is_picked_up(state, "Mug")
@@ -205,7 +208,10 @@ class SandwichChecklist:
 
         for task, checked in self.tasks.__dict__.items():
             if not checked:
-                setattr(self.tasks, task, getattr(self, "check_" + task)(state))
+                result = getattr(self, "check_" + task)(state)
+                setattr(self.tasks, task, result)
+                if result:
+                    self.checked_sequence.append(task)
 
         completed = list(self.tasks.__dict__.values()).count(True)
         incomplete = list(self.tasks.__dict__.values()).count(False)

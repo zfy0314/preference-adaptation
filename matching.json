@@ -1,0 +1,50 @@
+{
+  "results/result_participant_05-1668543353.2784986.json": [
+    15,
+    "sandwich_first"
+  ],
+  "results/result_participant_11-1668726195.2249057.json": [
+    16,
+    "sandwich_first"
+  ],
+  "results/result_participant_06-1668546064.7789865.json": [
+    15,
+    "interleave"
+  ],
+  "results/result_participant_04-1668471558.299589.json": [
+    15,
+    "interleave"
+  ],
+  "results/result_participant_14-1670445035.9894843.json": [
+    16,
+    "interleave"
+  ],
+  "results/result_participant_15-1670448026.6340508.json": [
+    15,
+    "sandwich_first"
+  ],
+  "results/result_participant_07-1668547831.9061146.json": [
+    16,
+    "interleave"
+  ],
+  "results/result_participant_10-1668718654.7970686.json": [
+    15,
+    "coffee_first"
+  ],
+  "results/result_participant_08-1668550734.4969385.json": [
+    15,
+    "coffee_first"
+  ],
+  "results/result_participant_09-1668701239.554034.json": [
+    16,
+    "interleave"
+  ],
+  "results/result_participant_16-1670533955.1682487.json": [
+    17,
+    "sandwich_first"
+  ],
+  "results/result_participant_13-1670443976.0697107.json": [
+    10,
+    "coffee_first"
+  ]
+}
